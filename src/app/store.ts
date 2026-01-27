@@ -21,6 +21,7 @@ const defaultSettings: AppSettings = {
   maxDiceOnTable: 12,
   resultByPhysics: false,
   reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  tableBackground: { type: 'preset', id: 'dark' },
 };
 
 export const useAppStore = create<AppState & {

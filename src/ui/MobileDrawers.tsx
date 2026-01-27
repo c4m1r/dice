@@ -5,7 +5,7 @@ export const MobileDrawerButtons: React.FC = () => {
   const { toggleLeftDrawer, toggleRightDrawer } = useAppStore();
 
   return (
-    <div className="lg:hidden fixed top-4 left-4 right-4 flex justify-between z-40 pointer-events-none">
+    <div className="min-[900px]:hidden fixed top-4 left-4 right-4 flex justify-center gap-3 z-40 pointer-events-none">
       <button
         onClick={toggleLeftDrawer}
         className="bg-gray-800 text-white p-3 rounded-lg shadow-lg hover:bg-gray-700 transition-colors pointer-events-auto"
@@ -33,7 +33,7 @@ export const Drawer: React.FC<DrawerProps> = ({ isOpen, onClose, side, children 
   if (!isOpen) return null;
 
   return (
-    <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex">
+    <div className="min-[900px]:hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex">
       <div
         className={`bg-gray-800 w-80 h-full ${
           side === 'right' ? 'ml-auto' : ''
