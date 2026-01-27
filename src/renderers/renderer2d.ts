@@ -20,6 +20,8 @@ export class Renderer2D {
   private animationId: number | null = null;
   private isAnimating = false;
   private settleCallback?: (results: { type: DieType; value: number }[]) => void;
+  private backgroundImage: HTMLImageElement | null = null;
+  private backgroundReady = false;
 
   private colors: Record<DieType, string> = {
     d4: '#16537e',
@@ -38,6 +40,7 @@ export class Renderer2D {
       return;
     }
     this.setupCanvas();
+    this.renderStatic();
   }
 
   private setupCanvas(): void {
@@ -47,8 +50,26 @@ export class Renderer2D {
     this.ctx.imageSmoothingEnabled = false;
   }
 
+  public setBackground(url?: string): void {
+    if (!url) {
+      this.backgroundImage = null;
+      this.backgroundReady = false;
+      this.renderStatic();
+      return;
+    }
+
+    const image = new Image();
+    image.onload = () => {
+      this.backgroundImage = image;
+      this.backgroundReady = true;
+      this.renderStatic();
+    };
+    image.src = url;
+  }
+
   public roll(dice: { type: DieType; value: number }[]): void {
     this.dice = [];
+    this.backgroundReady = !!this.backgroundImage;
     const centerX = this.canvas.width / 2;
     const centerY = this.canvas.height / 2;
     const spacing = 80;
@@ -128,8 +149,18 @@ export class Renderer2D {
 
   private clear(): void {
     if (!this.ctx) return;
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    if (this.backgroundImage && this.backgroundReady) {
+      this.ctx.drawImage(this.backgroundImage, 0, 0, this.canvas.width, this.canvas.height);
+      return;
+    }
     this.ctx.fillStyle = '#1a1a2e';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  private renderStatic(): void {
+    if (this.isAnimating) return;
+    this.clear();
   }
 
   private drawSpinningDie(die: Die2D): void {
@@ -259,6 +290,7 @@ export class Renderer2D {
     this.canvas.width = width;
     this.canvas.height = height;
     this.setupCanvas();
+    this.renderStatic();
   }
 
   public dispose(): void {
