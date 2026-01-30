@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { DieType } from '../app/types';
 
 interface Die3D {
@@ -11,14 +12,23 @@ interface Die3D {
   prerollValue?: number;
 }
 
+interface FaceNormal {
+  normal: THREE.Vector3;
+  value: number;
+}
+
 export class Renderer3D {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
+  private controls: OrbitControls;
   private world: CANNON.World;
   private dice: Die3D[] = [];
   private table: CANNON.Body;
+  private tableMesh: THREE.Mesh | null = null;
+  private tableMaterial: THREE.MeshLambertMaterial | null = null;
   private materials: Map<DieType, THREE.Material> = new Map();
+  private faceNormals: Map<DieType, FaceNormal[]> = new Map();
   private animationId: number | null = null;
   private isIdle = false;
   private lastActiveTime = 0;
@@ -58,6 +68,19 @@ export class Renderer3D {
     this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     this.renderer.shadowMap.enabled = false; // Disable shadows for performance
 
+    this.controls = new OrbitControls(this.camera, canvas);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.08;
+    this.controls.enablePan = false;
+    this.controls.minDistance = 8;
+    this.controls.maxDistance = 18;
+    this.controls.minPolarAngle = Math.PI / 6;
+    this.controls.maxPolarAngle = Math.PI / 2.2;
+
+    const isMobile = window.matchMedia('(max-width: 899px)').matches;
+    this.controls.rotateSpeed = isMobile ? 0.6 : 0.9;
+    this.controls.zoomSpeed = isMobile ? 0.6 : 0.9;
+
     // Lighting
     const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
     this.scene.add(hemisphereLight);
@@ -93,19 +116,21 @@ export class Renderer3D {
         opacity: 0.9
       }));
     });
+
+    this.buildFaceNormals();
   }
 
   private setupTable() {
     // Visual table
     const tableGeometry = new THREE.PlaneGeometry(20, 20);
-    const tableMaterial = new THREE.MeshLambertMaterial({ 
+    this.tableMaterial = new THREE.MeshLambertMaterial({ 
       color: 0x2d3748,
       transparent: true,
       opacity: 0.8
     });
-    const tableMesh = new THREE.Mesh(tableGeometry, tableMaterial);
-    tableMesh.rotation.x = -Math.PI / 2;
-    this.scene.add(tableMesh);
+    this.tableMesh = new THREE.Mesh(tableGeometry, this.tableMaterial);
+    this.tableMesh.rotation.x = -Math.PI / 2;
+    this.scene.add(this.tableMesh);
 
     // Physics table
     const tableShape = new CANNON.Plane();
@@ -152,6 +177,53 @@ export class Renderer3D {
       default:
         return new THREE.BoxGeometry(1, 1, 1);
     }
+  }
+
+  private buildFaceNormals(): void {
+    const diceTypes: DieType[] = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
+    diceTypes.forEach((type) => {
+      const geometry = this.createDieGeometry(type);
+      const normals = this.extractFaceNormals(geometry, (normal) => {
+        if (type === 'd10') {
+          return normal.y > -0.6;
+        }
+        return true;
+      });
+      const values = normals.map((normal, index) => ({
+        normal,
+        value: index + 1
+      }));
+      this.faceNormals.set(type, values);
+      geometry.dispose();
+    });
+  }
+
+  private extractFaceNormals(
+    geometry: THREE.BufferGeometry,
+    filter: (normal: THREE.Vector3) => boolean
+  ): THREE.Vector3[] {
+    const geom = geometry.toNonIndexed();
+    const position = geom.getAttribute('position');
+    const normals: THREE.Vector3[] = [];
+    const normalMap = new Map<string, THREE.Vector3>();
+
+    for (let i = 0; i < position.count; i += 3) {
+      const a = new THREE.Vector3().fromBufferAttribute(position, i);
+      const b = new THREE.Vector3().fromBufferAttribute(position, i + 1);
+      const c = new THREE.Vector3().fromBufferAttribute(position, i + 2);
+      const normal = new THREE.Vector3()
+        .subVectors(b, a)
+        .cross(new THREE.Vector3().subVectors(c, a))
+        .normalize();
+      if (!filter(normal)) continue;
+      const key = `${normal.x.toFixed(3)}:${normal.y.toFixed(3)}:${normal.z.toFixed(3)}`;
+      if (!normalMap.has(key)) {
+        normalMap.set(key, normal);
+      }
+    }
+
+    normalMap.forEach((value) => normals.push(value));
+    return normals;
   }
 
   private createDieBody(type: DieType): CANNON.Body {
@@ -276,7 +348,7 @@ export class Renderer3D {
     if (allSettled && this.dice.length > 0 && this.settleCallback) {
       const results = this.dice.map(die => ({
         type: die.type,
-        value: die.prerollValue || this.getDieValue(die)
+        value: this.getDieValue(die)
       }));
       
       this.settleCallback(results);
@@ -285,13 +357,26 @@ export class Renderer3D {
   }
 
   private getDieValue(die: Die3D): number {
-    if (!this.resultByPhysics) {
-      return die.prerollValue || Math.floor(Math.random() * parseInt(die.type.substring(1))) + 1;
-    }
-
-    // Simple physics-based result (can be improved with face normals)
     const sides = parseInt(die.type.substring(1));
-    return Math.floor(Math.random() * sides) + 1;
+    if (!this.resultByPhysics) {
+      return die.prerollValue ?? Math.floor(Math.random() * sides) + 1;
+    }
+    const faceNormals = this.faceNormals.get(die.type);
+    if (!faceNormals || faceNormals.length === 0) {
+      return Math.floor(Math.random() * sides) + 1;
+    }
+    const up = new THREE.Vector3(0, 1, 0);
+    let bestDot = -Infinity;
+    let bestValue = 1;
+    faceNormals.forEach(({ normal, value }) => {
+      const worldNormal = normal.clone().applyQuaternion(die.mesh.quaternion).normalize();
+      const dot = worldNormal.dot(up);
+      if (dot > bestDot) {
+        bestDot = dot;
+        bestValue = value;
+      }
+    });
+    return bestValue;
   }
 
   private startRenderLoop(): void {
@@ -323,6 +408,7 @@ export class Renderer3D {
       }
 
       this.checkSettled();
+      this.controls.update();
 
       // Only render if not idle or if forced
       if (!this.isIdle || now - this.lastActiveTime < 2000) {
@@ -347,12 +433,43 @@ export class Renderer3D {
     this.resultByPhysics = enabled;
   }
 
+  public setTableTexture(url?: string, repeat = 1): void {
+    if (!this.tableMaterial) return;
+
+    if (!url) {
+      this.tableMaterial.map = null;
+      this.tableMaterial.color.setHex(0x2d3748);
+      this.tableMaterial.needsUpdate = true;
+      return;
+    }
+
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      url,
+      (texture) => {
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(repeat, repeat);
+        this.tableMaterial!.map = texture;
+        this.tableMaterial!.color.setHex(0xffffff);
+        this.tableMaterial!.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        this.tableMaterial!.map = null;
+        this.tableMaterial!.color.setHex(0x2d3748);
+        this.tableMaterial!.needsUpdate = true;
+      }
+    );
+  }
+
   public dispose(): void {
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
     }
     
     this.clearDice();
+    this.controls.dispose();
     this.renderer.dispose();
   }
 }

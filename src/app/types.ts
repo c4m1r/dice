@@ -1,5 +1,9 @@
 export type DieType = 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20';
 
+export type TableBackgroundSetting =
+  | { type: 'preset'; id: string }
+  | { type: 'custom'; dataUrl: string };
+
 export interface DicePool {
   d4: number;
   d6: number;
@@ -36,6 +40,7 @@ export interface AppSettings {
   maxDiceOnTable: number;
   resultByPhysics: boolean;
   reducedMotion: boolean;
+  tableBackground: TableBackgroundSetting;
 }
 
 export interface AppState {
