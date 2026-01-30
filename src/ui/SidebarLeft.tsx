@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { Settings, BookOpen, Info, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Info, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6 } from 'lucide-react';
 import { useAppStore } from '../app/store';
 import { DieType } from '../app/types';
+import { getTotalDiceCount } from '../engine/diceEngine';
+import { useRollActions } from '../app/rollActions';
 
 const diceInfo: Record<DieType, { icon: any; name: string; description: string }> = {
   d4: { icon: Dice1, name: 'D4', description: 'Тетраэдр (4 грани)' },
@@ -19,14 +21,27 @@ export const SidebarLeft: React.FC = () => {
     updatePool, 
     updateSettings, 
     toggleMenuDrawer,
-    setLastSelectedDie 
+    setLastSelectedDie,
+    isRolling
   } = useAppStore();
+  const { rollPool, rollSingle } = useRollActions();
   
   const [showTooltip, setShowTooltip] = useState<DieType | null>(null);
+  const [modifierTipOpen, setModifierTipOpen] = useState(false);
+  const [holdPower, setHoldPower] = useState(0);
+  const [isHolding, setIsHolding] = useState(false);
+  const holdTimerRef = useRef<number | null>(null);
+  const holdStartRef = useRef<number>(0);
+  const holdingRef = useRef(false);
 
   const updateDieCount = (type: DieType, delta: number) => {
     const currentCount = pool[type];
     const newCount = Math.max(0, Math.min(20, currentCount + delta));
+    const totalAfter = getTotalDiceCount({ ...pool, [type]: newCount });
+    if (delta > 0 && totalAfter > settings.maxDiceOnTable) {
+      alert(`Слишком много костей! Максимум на столе: ${settings.maxDiceOnTable}`);
+      return;
+    }
     updatePool({ [type]: newCount });
     if (newCount > 0) {
       setLastSelectedDie(type);
@@ -38,6 +53,39 @@ export const SidebarLeft: React.FC = () => {
     updatePool({ modifier: newModifier });
   };
 
+  const startHold = () => {
+    if (isRolling) return;
+    setIsHolding(true);
+    holdingRef.current = true;
+    holdStartRef.current = Date.now();
+    
+    const updatePower = () => {
+      if (holdingRef.current) {
+        const elapsed = Date.now() - holdStartRef.current;
+        const power = Math.min(elapsed / 1500, 1);
+        setHoldPower(power);
+        holdTimerRef.current = requestAnimationFrame(updatePower);
+      }
+    };
+    
+    updatePower();
+  };
+
+  const endHold = () => {
+    if (!holdingRef.current) return;
+    setIsHolding(false);
+    holdingRef.current = false;
+    if (holdTimerRef.current) {
+      cancelAnimationFrame(holdTimerRef.current);
+    }
+    
+    const holdMs = Date.now() - holdStartRef.current;
+    const power = Math.max(0, Math.min(holdMs / 1500, 1));
+    rollSingle(power);
+    
+    setTimeout(() => setHoldPower(0), 200);
+  };
+
   return (
     <div className="w-80 bg-gray-800 text-white p-4 flex flex-col h-full">
       {/* Menu Button */}
@@ -45,7 +93,7 @@ export const SidebarLeft: React.FC = () => {
         onClick={toggleMenuDrawer}
         className="flex items-center gap-2 w-full p-3 bg-gray-700 rounded-lg hover:bg-gray-600 mb-4 transition-colors"
       >
-        <Settings size={20} />
+        <span className="text-lg">☰</span>
         Меню
       </button>
 
@@ -59,12 +107,18 @@ export const SidebarLeft: React.FC = () => {
             
             return (
               <div key={type} className="flex items-center gap-3 p-2 bg-gray-700 rounded">
-                <div 
-                  className="relative"
-                  onMouseEnter={() => setShowTooltip(type as DieType)}
-                  onMouseLeave={() => setShowTooltip(null)}
-                >
+                <div className="relative">
                   <IconComponent size={20} />
+                  <button
+                    type="button"
+                    onPointerEnter={() => setShowTooltip(type as DieType)}
+                    onPointerLeave={() => setShowTooltip(null)}
+                    onClick={() => setShowTooltip(showTooltip === type ? null : (type as DieType))}
+                    className="absolute -right-2 -top-2 w-4 h-4 rounded-full bg-gray-900 text-[10px] flex items-center justify-center"
+                    aria-label="Информация"
+                  >
+                    <Info size={10} />
+                  </button>
                   {showTooltip === type && (
                     <div className="absolute left-full ml-2 top-0 bg-gray-900 text-xs p-2 rounded whitespace-nowrap z-10">
                       {info.description}
@@ -158,7 +212,24 @@ export const SidebarLeft: React.FC = () => {
 
       {/* Modifier */}
       <div className="mb-6">
-        <h3 className="text-sm font-bold mb-2">Модификатор</h3>
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="text-sm font-bold">Модификатор</h3>
+          <button
+            type="button"
+            onPointerEnter={() => setModifierTipOpen(true)}
+            onPointerLeave={() => setModifierTipOpen(false)}
+            onClick={() => setModifierTipOpen(!modifierTipOpen)}
+            className="relative w-5 h-5 rounded-full bg-gray-700 text-xs flex items-center justify-center"
+            aria-label="Что делает модификатор"
+          >
+            <Info size={12} />
+            {modifierTipOpen && (
+              <span className="absolute left-full ml-2 top-0 bg-gray-900 text-xs p-2 rounded w-48 text-left z-10">
+                Добавляет или вычитает значение из общей суммы броска.
+              </span>
+            )}
+          </button>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => updateModifier(-1)}
@@ -183,9 +254,31 @@ export const SidebarLeft: React.FC = () => {
       </div>
 
       {/* Roll Button */}
-      <div className="mt-auto">
-        <button className="w-full py-4 bg-red-600 hover:bg-red-500 rounded-lg text-xl font-bold transition-colors active:scale-95">
-          БРОСИТЬ
+      <div className="mt-auto space-y-3">
+        <button
+          disabled={isRolling || getTotalDiceCount(pool) === 0}
+          onClick={() => rollPool()}
+          className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-xl font-bold transition-colors active:scale-95"
+        >
+          {isRolling ? 'Бросаю...' : 'БРОСИТЬ'}
+        </button>
+        <button
+          onPointerDown={startHold}
+          onPointerUp={endHold}
+          onPointerLeave={endHold}
+          onPointerCancel={endHold}
+          disabled={isRolling}
+          className={`w-full py-3 rounded-lg text-lg font-bold transition-all relative overflow-hidden ${
+            isHolding ? 'bg-red-500' : 'bg-red-600 hover:bg-red-500 disabled:bg-gray-600'
+          }`}
+        >
+          <div 
+            className="absolute top-0 left-0 h-full bg-red-400 transition-all duration-75"
+            style={{ width: `${holdPower * 100}%` }}
+          />
+          <span className="relative z-10">
+            {isHolding ? `Сила: ${Math.round(holdPower * 100)}%` : 'Кинуть одну'}
+          </span>
         </button>
       </div>
     </div>
