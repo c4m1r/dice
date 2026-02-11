@@ -1,9 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Info, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Coins } from 'lucide-react';
 import { useAppStore } from '../app/store';
 import { DieType } from '../app/types';
 import { getTotalDiceCount } from '../engine/diceEngine';
-import { useRollActions } from '../app/rollActions';
 
 const diceInfo: Record<DieType, { icon: any; name: string; description: string }> = {
   d2: { icon: Coins, name: 'D2', description: 'Монета (2 стороны)' },
@@ -23,18 +22,11 @@ export const SidebarLeft: React.FC = () => {
     updatePool,
     updateSettings,
     toggleMenuDrawer,
-    setLastSelectedDie,
-    isRolling
+    setLastSelectedDie
   } = useAppStore();
-  const { rollPool, rollSingle } = useRollActions();
 
   const [showTooltip, setShowTooltip] = useState<DieType | null>(null);
   const [modifierTipOpen, setModifierTipOpen] = useState(false);
-  const [holdPower, setHoldPower] = useState(0);
-  const [isHolding, setIsHolding] = useState(false);
-  const holdTimerRef = useRef<number | null>(null);
-  const holdStartRef = useRef<number>(0);
-  const holdingRef = useRef(false);
 
   const updateDieCount = (type: DieType, delta: number) => {
     const currentCount = pool[type];
@@ -55,39 +47,6 @@ export const SidebarLeft: React.FC = () => {
     updatePool({ modifier: newModifier });
   };
 
-  const startHold = () => {
-    if (isRolling) return;
-    setIsHolding(true);
-    holdingRef.current = true;
-    holdStartRef.current = Date.now();
-
-    const updatePower = () => {
-      if (holdingRef.current) {
-        const elapsed = Date.now() - holdStartRef.current;
-        const power = Math.min(elapsed / 1500, 1);
-        setHoldPower(power);
-        holdTimerRef.current = requestAnimationFrame(updatePower);
-      }
-    };
-
-    updatePower();
-  };
-
-  const endHold = () => {
-    if (!holdingRef.current) return;
-    setIsHolding(false);
-    holdingRef.current = false;
-    if (holdTimerRef.current) {
-      cancelAnimationFrame(holdTimerRef.current);
-    }
-
-    const holdMs = Date.now() - holdStartRef.current;
-    const power = Math.max(0, Math.min(holdMs / 1500, 1));
-    rollSingle(power);
-
-    setTimeout(() => setHoldPower(0), 200);
-  };
-
   return (
     <div className="w-full h-full text-white p-4 flex flex-col">
       {/* Menu Button */}
@@ -98,62 +57,6 @@ export const SidebarLeft: React.FC = () => {
         <span className="text-lg">☰</span>
         Меню
       </button>
-
-      {/* Dice Pool */}
-      <div className="mb-6">
-        <h2 className="text-lg font-bold mb-3">Кости</h2>
-        <div className="space-y-2">
-          {Object.entries(diceInfo).map(([type, info]) => {
-            const IconComponent = info.icon;
-            const count = pool[type as DieType];
-
-            return (
-              <div key={type} className="flex items-center gap-3 p-2 bg-gray-700 rounded">
-                <div className="relative">
-                  <IconComponent size={20} />
-                  <button
-                    type="button"
-                    onPointerEnter={() => setShowTooltip(type as DieType)}
-                    onPointerLeave={() => setShowTooltip(null)}
-                    onClick={() => setShowTooltip(showTooltip === type ? null : (type as DieType))}
-                    className="absolute -right-2 -top-2 w-4 h-4 rounded-full bg-gray-900 text-[10px] flex items-center justify-center"
-                    aria-label="Информация"
-                  >
-                    <Info size={10} />
-                  </button>
-                  {showTooltip === type && (
-                    <div className="absolute left-full ml-2 top-0 bg-gray-900 text-xs p-2 rounded whitespace-nowrap z-10">
-                      {info.description}
-                    </div>
-                  )}
-                </div>
-
-                <span className="w-8 text-sm font-mono">{info.name}</span>
-
-                <div className="flex items-center gap-2 ml-auto">
-                  <button
-                    onClick={() => updateDieCount(type as DieType, -1)}
-                    disabled={count === 0}
-                    className="w-8 h-8 bg-red-600 rounded text-lg font-bold hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    −
-                  </button>
-
-                  <span className="w-8 text-center font-mono">{count}</span>
-
-                  <button
-                    onClick={() => updateDieCount(type as DieType, 1)}
-                    disabled={count >= 20}
-                    className="w-8 h-8 bg-green-600 rounded text-lg font-bold hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Mode Toggles */}
       <div className="mb-6">
@@ -174,23 +77,217 @@ export const SidebarLeft: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => updateSettings({ mode: 'roll' })}
-            className={`flex-1 py-2 px-3 rounded transition-colors ${settings.mode === 'roll' ? 'bg-purple-600' : 'bg-gray-600 hover:bg-gray-500'
+            className={`py-2 px-3 rounded transition-colors ${settings.mode === 'roll' ? 'bg-purple-600' : 'bg-gray-600 hover:bg-gray-500'
               }`}
           >
             Броски
           </button>
           <button
             onClick={() => updateSettings({ mode: 'divination' })}
-            className={`flex-1 py-2 px-3 rounded transition-colors ${settings.mode === 'divination' ? 'bg-purple-600' : 'bg-gray-600 hover:bg-gray-500'
+            className={`py-2 px-3 rounded transition-colors ${settings.mode === 'divination' ? 'bg-purple-600' : 'bg-gray-600 hover:bg-gray-500'
               }`}
           >
             Гадания
           </button>
+          <button
+            onClick={() => updateSettings({ mode: 'randomizer' })}
+            className={`py-2 px-3 rounded transition-colors ${settings.mode === 'randomizer' ? 'bg-purple-600' : 'bg-gray-600 hover:bg-gray-500'
+              }`}
+          >
+            Рандом
+          </button>
+          <button
+            onClick={() => updateSettings({ mode: 'draw-straws' })}
+            className={`py-2 px-3 rounded transition-colors ${settings.mode === 'draw-straws' ? 'bg-purple-600' : 'bg-gray-600 hover:bg-gray-500'
+              }`}
+          >
+            Жребий
+          </button>
         </div>
       </div>
+
+      {/* Dice Pool - Only for Roll Mode */}
+      {settings.mode === 'roll' && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold">Кости</h2>
+            <div className="flex gap-1">
+              <button
+                onClick={() => updateSettings({ diceColor: 'mixed' })}
+                className={`w-4 h-4 rounded border ${settings.diceColor === 'mixed' ? 'border-white ring-1 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+                style={{ background: 'linear-gradient(135deg, #ef4444, #10b981, #3b82f6)' }}
+                title="Смешанный"
+              />
+              <button
+                onClick={() => updateSettings({ diceColor: 'red' })}
+                className={`w-4 h-4 rounded border bg-red-600 ${settings.diceColor === 'red' ? 'border-white ring-1 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+                title="Красный"
+              />
+              <button
+                onClick={() => updateSettings({ diceColor: 'green' })}
+                className={`w-4 h-4 rounded border bg-green-600 ${settings.diceColor === 'green' ? 'border-white ring-1 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+                title="Зеленый"
+              />
+              <button
+                onClick={() => updateSettings({ diceColor: 'blue' })}
+                className={`w-4 h-4 rounded border bg-blue-600 ${settings.diceColor === 'blue' ? 'border-white ring-1 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+                title="Синий"
+              />
+              <button
+                onClick={() => updateSettings({ diceColor: 'yellow' })}
+                className={`w-4 h-4 rounded border bg-yellow-500 ${settings.diceColor === 'yellow' ? 'border-white ring-1 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+                title="Желтый"
+              />
+              <button
+                onClick={() => updateSettings({ diceColor: 'purple' })}
+                className={`w-4 h-4 rounded border bg-purple-600 ${settings.diceColor === 'purple' ? 'border-white ring-1 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+                title="Фиолетовый"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            {Object.entries(diceInfo).map(([type, info]) => {
+              const IconComponent = info.icon;
+              const count = pool[type as DieType];
+
+              return (
+                <div key={type} className="flex items-center gap-3 p-2 bg-gray-700 rounded">
+                  <div className="relative">
+                    <IconComponent size={20} />
+                    <button
+                      type="button"
+                      onPointerEnter={() => setShowTooltip(type as DieType)}
+                      onPointerLeave={() => setShowTooltip(null)}
+                      onClick={() => setShowTooltip(showTooltip === type ? null : (type as DieType))}
+                      className="absolute -right-2 -top-2 w-4 h-4 rounded-full bg-gray-900 text-[10px] flex items-center justify-center"
+                      aria-label="Информация"
+                    >
+                      <Info size={10} />
+                    </button>
+                    {showTooltip === type && (
+                      <div className="absolute left-full ml-2 top-0 bg-gray-900 text-xs p-2 rounded whitespace-nowrap z-10">
+                        {info.description}
+                      </div>
+                    )}
+                  </div>
+
+                  <span className="w-8 text-sm font-mono">{info.name}</span>
+
+                  <div className="flex items-center gap-2 ml-auto">
+                    <button
+                      onClick={() => updateDieCount(type as DieType, -1)}
+                      disabled={count === 0}
+                      className="w-8 h-8 bg-red-600 rounded text-lg font-bold hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      −
+                    </button>
+
+                    <span className="w-8 text-center font-mono">{count}</span>
+
+                    <button
+                      onClick={() => updateDieCount(type as DieType, 1)}
+                      disabled={count >= 20}
+                      className="w-8 h-8 bg-green-600 rounded text-lg font-bold hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Modifier */}
+          <div className="mt-6">
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-sm font-bold">Модификатор</h3>
+              <button
+                type="button"
+                onPointerEnter={() => setModifierTipOpen(true)}
+                onPointerLeave={() => setModifierTipOpen(false)}
+                onClick={() => setModifierTipOpen(!modifierTipOpen)}
+                className="relative w-5 h-5 rounded-full bg-gray-700 text-xs flex items-center justify-center"
+                aria-label="Что делает модификатор"
+              >
+                <Info size={12} />
+                {modifierTipOpen && (
+                  <span className="absolute left-full ml-2 top-0 bg-gray-900 text-xs p-2 rounded w-48 text-left z-10">
+                    Добавляет или вычитает значение из общей суммы броска.
+                  </span>
+                )}
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => updateModifier(-1)}
+                disabled={pool.modifier <= -10}
+                className="w-8 h-8 bg-red-600 rounded font-bold hover:bg-red-500 disabled:opacity-50 transition-colors"
+              >
+                −
+              </button>
+
+              <span className="flex-1 text-center font-mono text-lg">
+                {pool.modifier >= 0 ? '+' : ''}{pool.modifier}
+              </span>
+
+              <button
+                onClick={() => updateModifier(1)}
+                disabled={pool.modifier >= 10}
+                className="w-8 h-8 bg-green-600 rounded font-bold hover:bg-green-500 disabled:opacity-50 transition-colors"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Randomizer Mode Controls */}
+      {settings.mode === 'randomizer' && (
+        <div className="mb-6">
+          <h3 className="text-sm font-bold mb-2">Диапазон (макс.)</h3>
+          <div className="flex items-center gap-3 p-2 bg-gray-700 rounded">
+            <input
+              type="range"
+              min="1"
+              max="1000000"
+              value={settings.randomizerMax || 100}
+              onChange={(e) => updateSettings({ randomizerMax: parseInt(e.target.value) })}
+              className="flex-1"
+            />
+            <input
+              type="number"
+              min="1"
+              max="1000000"
+              value={settings.randomizerMax || 100}
+              onChange={(e) => updateSettings({ randomizerMax: parseInt(e.target.value) })}
+              className="w-20 p-1 bg-gray-800 rounded text-center text-sm"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Draw Straws Controls */}
+      {settings.mode === 'draw-straws' && (
+        <div className="mb-6">
+          <h3 className="text-sm font-bold mb-2">Количество участников</h3>
+          <div className="flex items-center gap-3 p-2 bg-gray-700 rounded">
+            <input
+              type="range"
+              min="1"
+              max="12"
+              step="1"
+              value={settings.strawsCount || 6}
+              onChange={(e) => updateSettings({ strawsCount: parseInt(e.target.value) })}
+              className="flex-1"
+            />
+            <span className="w-8 text-center font-mono text-lg">{settings.strawsCount || 6}</span>
+          </div>
+        </div>
+      )}
 
       {/* Divination Sub-modes */}
       {settings.mode === 'divination' && (
@@ -207,49 +304,6 @@ export const SidebarLeft: React.FC = () => {
           </select>
         </div>
       )}
-
-      {/* Modifier */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <h3 className="text-sm font-bold">Модификатор</h3>
-          <button
-            type="button"
-            onPointerEnter={() => setModifierTipOpen(true)}
-            onPointerLeave={() => setModifierTipOpen(false)}
-            onClick={() => setModifierTipOpen(!modifierTipOpen)}
-            className="relative w-5 h-5 rounded-full bg-gray-700 text-xs flex items-center justify-center"
-            aria-label="Что делает модификатор"
-          >
-            <Info size={12} />
-            {modifierTipOpen && (
-              <span className="absolute left-full ml-2 top-0 bg-gray-900 text-xs p-2 rounded w-48 text-left z-10">
-                Добавляет или вычитает значение из общей суммы броска.
-              </span>
-            )}
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => updateModifier(-1)}
-            disabled={pool.modifier <= -10}
-            className="w-8 h-8 bg-red-600 rounded font-bold hover:bg-red-500 disabled:opacity-50 transition-colors"
-          >
-            −
-          </button>
-
-          <span className="flex-1 text-center font-mono text-lg">
-            {pool.modifier >= 0 ? '+' : ''}{pool.modifier}
-          </span>
-
-          <button
-            onClick={() => updateModifier(1)}
-            disabled={pool.modifier >= 10}
-            className="w-8 h-8 bg-green-600 rounded font-bold hover:bg-green-500 disabled:opacity-50 transition-colors"
-          >
-            +
-          </button>
-        </div>
-      </div>
 
     </div>
   );

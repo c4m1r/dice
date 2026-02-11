@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { AppState, DicePool, RollEvent, AppSettings, DieType, Language } from './types';
+import { AppState, DicePool, RollEvent, AppSettings, DieType } from './types';
 import { loadSettings, saveSettings, loadHistory, saveHistory } from './persistence';
 
 const defaultPool: DicePool = {
@@ -18,11 +18,14 @@ const defaultSettings: AppSettings = {
   view: '3d',
   mode: 'roll',
   divinationSubMode: 'one-die',
+  randomizerMax: 100,
+  strawsCount: 6,
   throwForce: 25,
   spinForce: 20,
   maxDiceOnTable: 12,
   resultByPhysics: false,
   reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  diceColor: 'mixed',
   tableBackground: { type: 'preset', id: 'dark' },
   language: 'en',
   welcomeShown: false,

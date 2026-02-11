@@ -57,7 +57,7 @@ export const MenuDrawer: React.FC = () => {
           🌐 Сайт разработчика
         </button>
       </div>
-      
+
       <div className="mt-4 pt-4 border-t border-gray-700 text-xs text-gray-400">
         Версия 1.2.7
       </div>
@@ -101,11 +101,10 @@ export const MenuDrawer: React.FC = () => {
               <button
                 key={preset.id}
                 onClick={() => updateSettings({ tableBackground: { type: 'preset', id: preset.id } })}
-                className={`rounded-lg border p-2 text-left transition-colors ${
-                  settings.tableBackground.type === 'preset' && settings.tableBackground.id === preset.id
+                className={`rounded-lg border p-2 text-left transition-colors ${settings.tableBackground.type === 'preset' && settings.tableBackground.id === preset.id
                     ? 'border-blue-400'
                     : 'border-transparent hover:border-gray-600'
-                }`}
+                  }`}
               >
                 <div
                   className="h-20 w-full rounded bg-cover bg-center"
@@ -115,11 +114,10 @@ export const MenuDrawer: React.FC = () => {
               </button>
             ))}
             <div
-              className={`rounded-lg border p-2 ${
-                settings.tableBackground.type === 'custom'
+              className={`rounded-lg border p-2 ${settings.tableBackground.type === 'custom'
                   ? 'border-blue-400'
                   : 'border-transparent hover:border-gray-600'
-              }`}
+                }`}
             >
               <div
                 className="h-20 w-full rounded bg-cover bg-center bg-gray-700"
@@ -158,10 +156,10 @@ export const MenuDrawer: React.FC = () => {
       >
         ← Назад к меню
       </button>
-      
+
       <div>
         <h3 className="font-bold mb-3">3D Настройки</h3>
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-sm mb-1">Сила броска: {settings.throwForce}</label>
@@ -174,7 +172,7 @@ export const MenuDrawer: React.FC = () => {
               className="w-full"
             />
           </div>
-          
+
           <div>
             <label className="block text-sm mb-1">Сила вращения: {settings.spinForce}</label>
             <input
@@ -186,7 +184,7 @@ export const MenuDrawer: React.FC = () => {
               className="w-full"
             />
           </div>
-          
+
           <div>
             <label className="block text-sm mb-1">Макс. костей на столе: {settings.maxDiceOnTable}</label>
             <input
@@ -198,7 +196,7 @@ export const MenuDrawer: React.FC = () => {
               className="w-full"
             />
           </div>
-          
+
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -210,7 +208,7 @@ export const MenuDrawer: React.FC = () => {
               Результат по физике (экспериментально)
             </label>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -224,7 +222,44 @@ export const MenuDrawer: React.FC = () => {
           </div>
         </div>
       </div>
-      
+
+      <div>
+        <h3 className="font-bold mb-3">Цвета костей</h3>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => updateSettings({ diceColor: 'mixed' })}
+            className={`w-12 h-12 rounded border-2 ${settings.diceColor === 'mixed' ? 'border-white ring-2 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+            style={{ background: 'linear-gradient(135deg, #ef4444, #10b981, #3b82f6)' }}
+            title="Смешанный"
+          />
+          <button
+            onClick={() => updateSettings({ diceColor: 'red' })}
+            className={`w-12 h-12 rounded border-2 bg-red-600 ${settings.diceColor === 'red' ? 'border-white ring-2 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+            title="Красный"
+          />
+          <button
+            onClick={() => updateSettings({ diceColor: 'green' })}
+            className={`w-12 h-12 rounded border-2 bg-green-600 ${settings.diceColor === 'green' ? 'border-white ring-2 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+            title="Зеленый"
+          />
+          <button
+            onClick={() => updateSettings({ diceColor: 'blue' })}
+            className={`w-12 h-12 rounded border-2 bg-blue-600 ${settings.diceColor === 'blue' ? 'border-white ring-2 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+            title="Синий"
+          />
+          <button
+            onClick={() => updateSettings({ diceColor: 'yellow' })}
+            className={`w-12 h-12 rounded border-2 bg-yellow-500 ${settings.diceColor === 'yellow' ? 'border-white ring-2 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+            title="Желтый"
+          />
+          <button
+            onClick={() => updateSettings({ diceColor: 'purple' })}
+            className={`w-12 h-12 rounded border-2 bg-purple-600 ${settings.diceColor === 'purple' ? 'border-white ring-2 ring-white' : 'border-gray-500 hover:border-gray-300'}`}
+            title="Фиолетовый"
+          />
+        </div>
+      </div>
+
       <div>
         <button
           onClick={clearHistory}
@@ -244,7 +279,7 @@ export const MenuDrawer: React.FC = () => {
       >
         ← Назад к меню
       </button>
-      
+
       <div>
         <h3 className="font-bold mb-4">Кости</h3>
         <div className="space-y-3 text-sm">
@@ -255,7 +290,7 @@ export const MenuDrawer: React.FC = () => {
           ))}
         </div>
       </div>
-      
+
       <div>
         <h3 className="font-bold mb-4">Гадания</h3>
         <div className="space-y-6 text-sm">
@@ -302,7 +337,7 @@ export const MenuDrawer: React.FC = () => {
       >
         ← Назад к меню
       </button>
-      
+
       <div>
         <h3 className="font-bold mb-4">DnD Dice Roller</h3>
         <div className="space-y-3 text-sm">
@@ -347,15 +382,15 @@ export const MenuDrawer: React.FC = () => {
             <X size={20} />
           </button>
         </div>
-        
+
         {currentPage === 'menu' && renderMenu()}
         {currentPage === 'settings' && renderSettings()}
         {currentPage === 'encyclopedia' && renderEncyclopedia()}
         {currentPage === 'table-bg' && renderTableBackground()}
         {currentPage === 'about' && renderAbout()}
       </div>
-      
-      <div 
+
+      <div
         className="flex-1"
         onClick={toggleMenuDrawer}
       />

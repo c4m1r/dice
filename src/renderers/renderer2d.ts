@@ -324,6 +324,134 @@ export class Renderer2D {
     }
   }
 
+  public showRandomNumber(number: number): void {
+    this.clear();
+    if (!this.ctx) return;
+
+    const centerX = this.canvas.width / 2;
+    const centerY = this.canvas.height / 2;
+
+    // Draw card background
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.fillRect(centerX - 150, centerY - 200, 300, 400);
+
+    // Draw border
+    this.ctx.strokeStyle = '#cccccc';
+    this.ctx.lineWidth = 4;
+    this.ctx.strokeRect(centerX - 150, centerY - 200, 300, 400);
+
+    // Draw number
+    this.ctx.fillStyle = '#000000';
+    this.ctx.font = 'bold 80px Arial';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText(number.toString(), centerX, centerY);
+
+    // Trigger callback immediately
+    if (this.settleCallback) {
+      setTimeout(() => {
+        this.settleCallback?.([{ type: 'd20', value: number }]);
+        this.settleCallback = undefined;
+      }, 100);
+    }
+  }
+
+  public showDrawStraws(count: number): void {
+    this.clear();
+    if (!this.ctx) return;
+
+    const centerX = this.canvas.width / 2;
+    const centerY = this.canvas.height / 2;
+
+    // Generate random lengths and shuffled sequences
+    const strawData: { length: number; sequence: number; x: number; y: number }[] = [];
+    const sequences = Array.from({ length: count }, (_, i) => i + 1);
+
+    // Fisher-Yates shuffle
+    for (let i = sequences.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [sequences[i], sequences[j]] = [sequences[j], sequences[i]];
+    }
+
+    // Calculate grid positions
+    const spacing = 80;
+    const cols = Math.min(count, 4);
+    const rows = Math.ceil(count / cols);
+    const startX = centerX - ((cols - 1) * spacing) / 2;
+    const startY = centerY - ((rows - 1) * spacing) / 2;
+
+    for (let i = 0; i < count; i++) {
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const x = startX + col * spacing;
+      const y = startY + row * spacing;
+      const length = 30 + Math.random() * 40; // Random length
+
+      strawData.push({
+        length,
+        sequence: sequences[i],
+        x,
+        y
+      });
+    }
+
+    // Find shortest straw
+    const shortestIndex = strawData.reduce((shortest, current, idx) =>
+      current.length < strawData[shortest].length ? idx : shortest, 0
+    );
+
+    // Draw all straws
+    strawData.forEach((data, index) => {
+      const isWinner = index === shortestIndex;
+
+      // Straw body
+      this.ctx!.fillStyle = isWinner ? '#111111' : '#8b4513';
+      this.ctx!.fillRect(data.x - 3, data.y - data.length / 2, 6, data.length);
+
+      // Red head
+      this.ctx!.fillStyle = isWinner ? '#111111' : '#ff0000';
+      this.ctx!.beginPath();
+      this.ctx!.arc(data.x, data.y - data.length / 2, 5, 0, Math.PI * 2);
+      this.ctx!.fill();
+
+      // Sequence number
+      this.ctx!.fillStyle = '#ffffff';
+      this.ctx!.font = 'bold 16px Arial';
+      this.ctx!.textAlign = 'center';
+      this.ctx!.textBaseline = 'middle';
+      this.ctx!.fillText(data.sequence.toString(), data.x, data.y - data.length / 2);
+
+      // Fire effect for winner
+      if (isWinner) {
+        // Draw simple flame shapes
+        for (let i = 0; i < 3; i++) {
+          const flameY = data.y - data.length / 2 - 10 - i * 8;
+          const flameSize = 8 - i * 2;
+
+          this.ctx!.fillStyle = i === 0 ? '#ffff64' : i === 1 ? '#ff9600' : '#ff3200';
+          this.ctx!.beginPath();
+          this.ctx!.moveTo(data.x, flameY - flameSize);
+          this.ctx!.lineTo(data.x - flameSize / 2, flameY);
+          this.ctx!.lineTo(data.x + flameSize / 2, flameY);
+          this.ctx!.closePath();
+          this.ctx!.fill();
+        }
+      }
+    });
+
+    // Trigger callback with results
+    if (this.settleCallback) {
+      setTimeout(() => {
+        const results = strawData.map(data => ({
+          type: 'd20' as DieType,
+          value: data.sequence
+        }));
+        this.settleCallback?.(results);
+        this.settleCallback = undefined;
+      }, 100);
+    }
+  }
+
   public dispose(): void {
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);

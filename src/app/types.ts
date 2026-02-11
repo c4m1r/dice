@@ -25,7 +25,7 @@ export interface DieResult {
 export interface RollEvent {
   id: string;
   timestamp: number;
-  mode: 'roll' | 'divination';
+  mode: 'roll' | 'divination' | 'randomizer' | 'draw-straws';
   view: '2d' | '3d';
   subMode?: string;
   pool: DicePool;
@@ -36,13 +36,16 @@ export interface RollEvent {
 
 export interface AppSettings {
   view: '2d' | '3d';
-  mode: 'roll' | 'divination';
+  mode: 'roll' | 'divination' | 'randomizer' | 'draw-straws';
   divinationSubMode: 'one-die' | 'two-dice' | 'three-dice';
+  randomizerMax?: number;
+  strawsCount?: number;
   throwForce: number;
   spinForce: number;
   maxDiceOnTable: number;
   resultByPhysics: boolean;
   reducedMotion: boolean;
+  diceColor: 'mixed' | 'red' | 'green' | 'blue' | 'yellow' | 'purple';
   tableBackground: TableBackgroundSetting;
   language: Language;
   welcomeShown: boolean;

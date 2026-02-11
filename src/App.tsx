@@ -134,6 +134,13 @@ function App() {
     }
   }, [settings.tableBackground]);
 
+  // Update dice color
+  useEffect(() => {
+    if (renderer3DRef.current) {
+      renderer3DRef.current.setDiceColor(settings.diceColor);
+    }
+  }, [settings.diceColor]);
+
 
   // Emergency timeout for stuck rolling state
   useEffect(() => {
@@ -299,6 +306,81 @@ function App() {
     performRoll(singlePool, { throwForce, spinForce, source: 'single' });
   }, [lastSelectedDie, performRoll, settings.spinForce, settings.throwForce]);
 
+  const performRandomizer = useCallback(() => {
+    setIsRolling(true);
+    const maxValue = settings.randomizerMax || 100;
+    const randomNumber = Math.floor(Math.random() * maxValue) + 1;
+
+    const activeRenderer = (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion)
+      ? renderer3DRef.current
+      : renderer2DRef.current;
+
+    if (!activeRenderer) {
+      setIsRolling(false);
+      return;
+    }
+
+    const onSettled = () => {
+      const event = {
+        id: generateRollId(),
+        timestamp: Date.now(),
+        mode: 'randomizer' as 'roll' | 'divination',
+        view: settings.view,
+        pool: { d2: 0, d4: 0, d5: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0, modifier: 0 },
+        results: [{ type: 'd20' as DieType, value: randomNumber }],
+        total: randomNumber
+      };
+
+      addToHistory(event);
+      setIsRolling(false);
+    };
+
+    if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
+      renderer3DRef.current.onSettled(onSettled);
+      renderer3DRef.current.showRandomNumber(randomNumber);
+    } else if (renderer2DRef.current) {
+      renderer2DRef.current.onSettled(onSettled);
+      renderer2DRef.current.showRandomNumber(randomNumber);
+    }
+  }, [settings, addToHistory, setIsRolling]);
+
+  const performDrawStraws = useCallback(() => {
+    setIsRolling(true);
+    const count = settings.strawsCount || 6;
+
+    const activeRenderer = (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion)
+      ? renderer3DRef.current
+      : renderer2DRef.current;
+
+    if (!activeRenderer) {
+      setIsRolling(false);
+      return;
+    }
+
+    const onSettled = (results: DieResult[]) => {
+      const event = {
+        id: generateRollId(),
+        timestamp: Date.now(),
+        mode: 'draw-straws' as 'roll' | 'divination',
+        view: settings.view,
+        pool: { d2: 0, d4: 0, d5: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0, modifier: 0 },
+        results,
+        total: results.reduce((sum, r) => sum + r.value, 0)
+      };
+
+      addToHistory(event);
+      setIsRolling(false);
+    };
+
+    if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
+      renderer3DRef.current.onSettled(onSettled);
+      renderer3DRef.current.showDrawStraws(count);
+    } else if (renderer2DRef.current) {
+      renderer2DRef.current.onSettled(onSettled);
+      renderer2DRef.current.showDrawStraws(count);
+    }
+  }, [settings, addToHistory, setIsRolling]);
+
   // Автоматический бросок при запуске отключён
 
   const rollActions = useMemo(() => ({
@@ -439,92 +521,103 @@ function App() {
         {/* Bottom Control Bar */}
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20">
           <button
-            disabled={isRolling || getTotalDiceCount(pool) === 0}
-            onClick={() => performRoll()}
+            disabled={isRolling || (settings.mode === 'roll' && getTotalDiceCount(pool) === 0)}
+            onClick={() => {
+              if (settings.mode === 'randomizer') {
+                performRandomizer();
+              } else if (settings.mode === 'draw-straws') {
+                performDrawStraws();
+              } else {
+                performRoll();
+              }
+            }}
             className="px-8 py-4 bg-red-600 hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg text-xl font-bold transition-colors active:scale-95 text-white shadow-lg"
           >
-            {isRolling ? 'Бросаю...' : 'БРОСИТЬ'}
+            {isRolling ? 'Бросаю...' : settings.mode === 'randomizer' ? 'ГЕНЕРИРОВАТЬ' : settings.mode === 'draw-straws' ? 'ТЯНУТЬ ЖРЕБИЙ' : 'БРОСИТЬ'}
           </button>
 
-          <button
-            onPointerDown={(e) => {
-              e.preventDefault();
-              if (isRolling) return;
+          {/* Manual roll button - only in roll/divination modes */}
+          {(settings.mode === 'roll' || settings.mode === 'divination') && (
+            <button
+              onPointerDown={(e) => {
+                e.preventDefault();
+                if (isRolling) return;
 
-              // Check constraints
-              const currentCount = renderer3DRef.current?.getDiceCount() ?? getTotalDiceCount(pool);
-              if (currentCount >= settings.maxDiceOnTable) {
-                alert(`Максимум костей: ${settings.maxDiceOnTable}`);
-                return;
-              }
-
-              setIsRolling(true);
-              const die = lastSelectedDie || 'd20';
-
-              if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
-                renderer3DRef.current.spawnSuspendedDie(die);
-              }
-
-              const startTime = Date.now();
-
-              const handlePointerUp = () => {
-                const holdTime = Date.now() - startTime;
-                const power = Math.min(holdTime / 1500, 1);
-
-                if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
-                  renderer3DRef.current.onSettled((results) => {
-                    const finalTotal = calculateTotal(results, pool.modifier);
-
-                    // Reconstruct pool from results
-                    const newPool: DicePool = {
-                      d2: 0, d4: 0, d5: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0,
-                      modifier: pool.modifier
-                    };
-
-                    results.forEach(r => {
-                      if (typeof newPool[r.type] === 'number') {
-                        newPool[r.type]++;
-                      }
-                    });
-
-                    const event = {
-                      id: generateRollId(),
-                      timestamp: Date.now(),
-                      mode: settings.mode as 'roll' | 'divination',
-                      view: settings.view,
-                      subMode: 'manual',
-                      pool: newPool,
-                      results,
-                      total: finalTotal
-                    };
-                    addToHistory(event);
-                    setIsRolling(false);
-                  });
-
-                  const throwForce = settings.throwForce * (0.4 + 1.2 * power);
-                  const spinForce = settings.spinForce;
-                  renderer3DRef.current.releaseSuspendedDice(throwForce, spinForce);
-                } else {
-                  // Fallback for 2D 
-                  performSingleRoll(power);
+                // Check constraints
+                const currentCount = renderer3DRef.current?.getDiceCount() ?? getTotalDiceCount(pool);
+                if (currentCount >= settings.maxDiceOnTable) {
+                  alert(`Максимум костей: ${settings.maxDiceOnTable}`);
+                  return;
                 }
 
-                document.removeEventListener('pointerup', handlePointerUp);
-                document.removeEventListener('pointercancel', handlePointerUp);
-              };
+                setIsRolling(true);
+                const die = lastSelectedDie || 'd20';
 
-              document.addEventListener('pointerup', handlePointerUp);
-              document.addEventListener('pointercancel', handlePointerUp);
-            }}
-            disabled={isRolling}
-            className="w-16 h-16 bg-orange-600 hover:bg-orange-500 disabled:bg-gray-600 rounded-lg transition-colors active:scale-95 text-white shadow-lg flex items-center justify-center"
-            title="Кинуть одну (удерживайте для силы)"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <circle cx="12" cy="12" r="1" fill="currentColor" />
-            </svg>
-          </button>
+                if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
+                  renderer3DRef.current.spawnSuspendedDie(die);
+                }
+
+                const startTime = Date.now();
+
+                const handlePointerUp = () => {
+                  const holdTime = Date.now() - startTime;
+                  const power = Math.min(holdTime / 1500, 1);
+
+                  if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
+                    renderer3DRef.current.onSettled((results) => {
+                      const finalTotal = calculateTotal(results, pool.modifier);
+
+                      // Reconstruct pool from results
+                      const newPool: DicePool = {
+                        d2: 0, d4: 0, d5: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0,
+                        modifier: pool.modifier
+                      };
+
+                      results.forEach(r => {
+                        if (typeof newPool[r.type] === 'number') {
+                          newPool[r.type]++;
+                        }
+                      });
+
+                      const event = {
+                        id: generateRollId(),
+                        timestamp: Date.now(),
+                        mode: settings.mode as 'roll' | 'divination',
+                        view: settings.view,
+                        subMode: 'manual',
+                        pool: newPool,
+                        results,
+                        total: finalTotal
+                      };
+                      addToHistory(event);
+                      setIsRolling(false);
+                    });
+
+                    const throwForce = settings.throwForce * (0.4 + 1.2 * power);
+                    const spinForce = settings.spinForce;
+                    renderer3DRef.current.releaseSuspendedDice(throwForce, spinForce);
+                  } else {
+                    // Fallback for 2D 
+                    performSingleRoll(power);
+                  }
+
+                  document.removeEventListener('pointerup', handlePointerUp);
+                  document.removeEventListener('pointercancel', handlePointerUp);
+                };
+
+                document.addEventListener('pointerup', handlePointerUp);
+                document.addEventListener('pointercancel', handlePointerUp);
+              }}
+              disabled={isRolling}
+              className="w-16 h-16 bg-orange-600 hover:bg-orange-500 disabled:bg-gray-600 rounded-lg transition-colors active:scale-95 text-white shadow-lg flex items-center justify-center"
+              title="Кинуть одну (удерживайте для силы)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="12" cy="12" r="1" fill="currentColor" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Menu Drawer */}

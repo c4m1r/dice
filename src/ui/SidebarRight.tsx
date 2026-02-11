@@ -77,9 +77,15 @@ export const SidebarRight: React.FC = () => {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-gray-300">{formatTime(event.timestamp)}</span>
                   <div className="flex gap-1 text-xs">
-                    <span className={`px-2 py-1 rounded ${event.mode === 'roll' ? 'bg-purple-600' : 'bg-orange-600'
+                    <span className={`px-2 py-1 rounded ${event.mode === 'roll' ? 'bg-purple-600' :
+                        event.mode === 'randomizer' ? 'bg-green-600' :
+                          event.mode === 'draw-straws' ? 'bg-yellow-600' :
+                            'bg-orange-600'
                       }`}>
-                      {event.mode === 'roll' ? 'Броски' : 'Гадания'}
+                      {event.mode === 'roll' ? 'Броски' :
+                        event.mode === 'randomizer' ? 'Рандом' :
+                          event.mode === 'draw-straws' ? 'Жребий' :
+                            'Гадания'}
                     </span>
                     <span className="px-2 py-1 bg-blue-600 rounded">
                       {event.view.toUpperCase()}
