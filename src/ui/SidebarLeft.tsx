@@ -15,17 +15,17 @@ const diceInfo: Record<DieType, { icon: any; name: string; description: string }
 };
 
 export const SidebarLeft: React.FC = () => {
-  const { 
-    pool, 
-    settings, 
-    updatePool, 
-    updateSettings, 
+  const {
+    pool,
+    settings,
+    updatePool,
+    updateSettings,
     toggleMenuDrawer,
     setLastSelectedDie,
     isRolling
   } = useAppStore();
   const { rollPool, rollSingle } = useRollActions();
-  
+
   const [showTooltip, setShowTooltip] = useState<DieType | null>(null);
   const [modifierTipOpen, setModifierTipOpen] = useState(false);
   const [holdPower, setHoldPower] = useState(0);
@@ -58,7 +58,7 @@ export const SidebarLeft: React.FC = () => {
     setIsHolding(true);
     holdingRef.current = true;
     holdStartRef.current = Date.now();
-    
+
     const updatePower = () => {
       if (holdingRef.current) {
         const elapsed = Date.now() - holdStartRef.current;
@@ -67,7 +67,7 @@ export const SidebarLeft: React.FC = () => {
         holdTimerRef.current = requestAnimationFrame(updatePower);
       }
     };
-    
+
     updatePower();
   };
 
@@ -78,16 +78,16 @@ export const SidebarLeft: React.FC = () => {
     if (holdTimerRef.current) {
       cancelAnimationFrame(holdTimerRef.current);
     }
-    
+
     const holdMs = Date.now() - holdStartRef.current;
     const power = Math.max(0, Math.min(holdMs / 1500, 1));
     rollSingle(power);
-    
+
     setTimeout(() => setHoldPower(0), 200);
   };
 
   return (
-    <div className="w-80 bg-gray-800 text-white p-4 flex flex-col h-full">
+    <div className="w-full h-full text-white p-4 flex flex-col">
       {/* Menu Button */}
       <button
         onClick={toggleMenuDrawer}
@@ -104,7 +104,7 @@ export const SidebarLeft: React.FC = () => {
           {Object.entries(diceInfo).map(([type, info]) => {
             const IconComponent = info.icon;
             const count = pool[type as DieType];
-            
+
             return (
               <div key={type} className="flex items-center gap-3 p-2 bg-gray-700 rounded">
                 <div className="relative">
@@ -125,9 +125,9 @@ export const SidebarLeft: React.FC = () => {
                     </div>
                   )}
                 </div>
-                
+
                 <span className="w-8 text-sm font-mono">{info.name}</span>
-                
+
                 <div className="flex items-center gap-2 ml-auto">
                   <button
                     onClick={() => updateDieCount(type as DieType, -1)}
@@ -136,9 +136,9 @@ export const SidebarLeft: React.FC = () => {
                   >
                     −
                   </button>
-                  
+
                   <span className="w-8 text-center font-mono">{count}</span>
-                  
+
                   <button
                     onClick={() => updateDieCount(type as DieType, 1)}
                     disabled={count >= 20}
@@ -158,36 +158,32 @@ export const SidebarLeft: React.FC = () => {
         <div className="flex gap-2 mb-3">
           <button
             onClick={() => updateSettings({ view: '2d' })}
-            className={`flex-1 py-2 px-3 rounded transition-colors ${
-              settings.view === '2d' ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-500'
-            }`}
+            className={`flex-1 py-2 px-3 rounded transition-colors ${settings.view === '2d' ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-500'
+              }`}
           >
             2D
           </button>
           <button
             onClick={() => updateSettings({ view: '3d' })}
-            className={`flex-1 py-2 px-3 rounded transition-colors ${
-              settings.view === '3d' ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-500'
-            }`}
+            className={`flex-1 py-2 px-3 rounded transition-colors ${settings.view === '3d' ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-500'
+              }`}
           >
             3D
           </button>
         </div>
-        
+
         <div className="flex gap-2">
           <button
             onClick={() => updateSettings({ mode: 'roll' })}
-            className={`flex-1 py-2 px-3 rounded transition-colors ${
-              settings.mode === 'roll' ? 'bg-purple-600' : 'bg-gray-600 hover:bg-gray-500'
-            }`}
+            className={`flex-1 py-2 px-3 rounded transition-colors ${settings.mode === 'roll' ? 'bg-purple-600' : 'bg-gray-600 hover:bg-gray-500'
+              }`}
           >
             Броски
           </button>
           <button
             onClick={() => updateSettings({ mode: 'divination' })}
-            className={`flex-1 py-2 px-3 rounded transition-colors ${
-              settings.mode === 'divination' ? 'bg-purple-600' : 'bg-gray-600 hover:bg-gray-500'
-            }`}
+            className={`flex-1 py-2 px-3 rounded transition-colors ${settings.mode === 'divination' ? 'bg-purple-600' : 'bg-gray-600 hover:bg-gray-500'
+              }`}
           >
             Гадания
           </button>
@@ -238,11 +234,11 @@ export const SidebarLeft: React.FC = () => {
           >
             −
           </button>
-          
+
           <span className="flex-1 text-center font-mono text-lg">
             {pool.modifier >= 0 ? '+' : ''}{pool.modifier}
           </span>
-          
+
           <button
             onClick={() => updateModifier(1)}
             disabled={pool.modifier >= 10}

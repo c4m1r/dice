@@ -30,12 +30,12 @@ export const SidebarRight: React.FC = () => {
   const handleClearHistory = () => {
     const lastWarningTime = localStorage.getItem('lastClearWarning');
     const now = Date.now();
-    
+
     // Показываем предупреждение если прошло больше часа
     if (!lastWarningTime || now - parseInt(lastWarningTime) > 3600000) {
       setShowWarning(true);
       localStorage.setItem('lastClearWarning', now.toString());
-      
+
       setTimeout(() => {
         setShowWarning(false);
       }, 5000);
@@ -45,7 +45,7 @@ export const SidebarRight: React.FC = () => {
   };
 
   return (
-    <div className="w-80 bg-gray-800 text-white p-4 flex flex-col h-full">
+    <div className="w-full h-full text-white p-4 flex flex-col">
       {/* History */}
       <div className="flex-1 flex flex-col">
         <div className="relative mb-3">
@@ -59,14 +59,14 @@ export const SidebarRight: React.FC = () => {
             </button>
           )}
         </div>
-        
+
         {/* Warning popup */}
         {showWarning && (
           <div className="mb-3 bg-yellow-600/20 border border-yellow-600/50 rounded p-3 text-xs text-yellow-200">
             Если ты уверен то очищай, но помни DND мастер спалит тебя по истории, слабый и жалкий читер
           </div>
         )}
-        
+
         <div className="flex-1 overflow-y-auto space-y-3">
           {history.length === 0 ? (
             <p className="text-gray-400 text-center py-8">История пуста</p>
@@ -77,9 +77,8 @@ export const SidebarRight: React.FC = () => {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-gray-300">{formatTime(event.timestamp)}</span>
                   <div className="flex gap-1 text-xs">
-                    <span className={`px-2 py-1 rounded ${
-                      event.mode === 'roll' ? 'bg-purple-600' : 'bg-orange-600'
-                    }`}>
+                    <span className={`px-2 py-1 rounded ${event.mode === 'roll' ? 'bg-purple-600' : 'bg-orange-600'
+                      }`}>
                       {event.mode === 'roll' ? 'Броски' : 'Гадания'}
                     </span>
                     <span className="px-2 py-1 bg-blue-600 rounded">
@@ -87,7 +86,7 @@ export const SidebarRight: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                
+
                 {/* Pool and Results */}
                 <div className="mb-2">
                   <div className="text-gray-300">Пул: {formatPool(event.pool)}</div>
@@ -97,14 +96,14 @@ export const SidebarRight: React.FC = () => {
                     <div className="text-gray-300">Модификатор: {event.pool.modifier >= 0 ? '+' : ''}{event.pool.modifier}</div>
                   )}
                 </div>
-                
+
                 {/* Interpretation */}
                 {event.interpretationText && (
                   <div className="mb-2 p-2 bg-gray-600 rounded italic text-xs">
                     {event.interpretationText}
                   </div>
                 )}
-                
+
                 {/* Actions */}
                 <div className="flex gap-2">
                   <button

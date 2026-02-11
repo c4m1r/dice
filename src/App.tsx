@@ -4,16 +4,15 @@ import { RollActionsProvider } from './app/rollActions';
 import { SidebarLeft } from './ui/SidebarLeft';
 import { SidebarRight } from './ui/SidebarRight';
 import { MenuDrawer } from './ui/MenuDrawer';
-import { MobileDrawerButtons, Drawer } from './ui/MobileDrawers';
 import { WelcomeScreen } from './ui/WelcomeScreen';
 import { Renderer3D } from './renderers/renderer3d';
 import { Renderer2D } from './renderers/renderer2d';
-import { 
+import {
   rollPool as rollDicePool,
-  calculateTotal, 
+  calculateTotal,
   generateRollId,
   getDiceInPool,
-  getTotalDiceCount 
+  getTotalDiceCount
 } from './engine/diceEngine';
 import { performDivination } from './engine/divination';
 import * as THREE from 'three';
@@ -35,7 +34,7 @@ function App() {
     updateSettings
   } = useAppStore();
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const renderer3DRef = useRef<Renderer3D | null>(null);
   const renderer2DRef = useRef<Renderer2D | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -65,7 +64,7 @@ function App() {
       const rect = newCanvas.getBoundingClientRect();
       newCanvas.width = rect.width;
       newCanvas.height = rect.height;
-      
+
       if (renderer3DRef.current) {
         renderer3DRef.current.resize(rect.width, rect.height);
       }
@@ -101,8 +100,9 @@ function App() {
     resizeCanvas();
     setIsInitialized(true);
 
-    const resizeObserver = new ResizeObserver(resizeCanvas);
-    resizeObserver.observe(canvas);
+    const observerTarget = parent || document.body;
+    const resizeObserver = new ResizeObserver(() => resizeCanvas());
+    resizeObserver.observe(observerTarget);
 
     return () => {
       resizeObserver.disconnect();
@@ -158,7 +158,7 @@ function App() {
     let poolForRoll = customPool;
     if (settings.mode === 'divination' && overrides?.source !== 'single') {
       poolForRoll = { ...pool, modifier: 0 };
-      
+
       switch (settings.divinationSubMode) {
         case 'one-die':
           poolForRoll = { d20: 4, d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, modifier: 0 };
@@ -188,8 +188,8 @@ function App() {
     const preResults = rollDicePool(poolForRoll);
 
     // Handle rendering
-    const activeRenderer = (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) 
-      ? renderer3DRef.current 
+    const activeRenderer = (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion)
+      ? renderer3DRef.current
       : renderer2DRef.current;
 
     if (!activeRenderer) {
@@ -207,7 +207,7 @@ function App() {
       const finalTotal = calculateTotal(finalResults, poolForRoll.modifier);
 
       let interpretationText: string | undefined;
-      
+
       if (settings.mode === 'divination') {
         const values = finalResults.map(r => r.value);
         interpretationText = performDivination(settings.divinationSubMode, values);
@@ -232,7 +232,7 @@ function App() {
     if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
       // 3D Roll
       renderer3DRef.current.clearDice();
-      
+
       const diceList = getDiceInPool(poolForRoll);
       let index = 0;
       const usedResults = new Set<number>();
@@ -243,7 +243,7 @@ function App() {
         usedResults.add(resultIndex);
         return preResults[resultIndex].value;
       };
-      
+
       diceList.forEach(({ type, count }) => {
         for (let i = 0; i < count; i++) {
           const angle = (index / totalDice) * Math.PI * 2;
@@ -253,13 +253,13 @@ function App() {
             5 + Math.random() * 2,
             Math.sin(angle) * radius
           );
-          
+
           const prerollValue = !settings.resultByPhysics ? takePrerollValue(type) : undefined;
-          
+
           renderer3DRef.current!.addDie(
-            type, 
-            position, 
-            overrides?.throwForce ?? settings.throwForce, 
+            type,
+            position,
+            overrides?.throwForce ?? settings.throwForce,
             overrides?.spinForce ?? settings.spinForce,
             prerollValue
           );
@@ -274,7 +274,7 @@ function App() {
         type: result.type,
         value: result.value
       }));
-      
+
       renderer2DRef.current.roll(diceForRender);
       renderer2DRef.current.onSettled(onSettled);
     }
@@ -370,41 +370,30 @@ function App() {
           className="absolute inset-0 w-full h-full touch-none"
         />
 
-        {/* Backdrop for open menus */}
-        {(leftDrawerOpen || rightDrawerOpen) && (
-          <div 
-            className="absolute inset-0 bg-black/40 z-30 transition-opacity"
-            onClick={() => {
-              if (leftDrawerOpen) toggleLeftDrawer();
-              if (rightDrawerOpen) toggleRightDrawer();
-            }}
-          />
-        )}
+
 
         {/* Left Sidebar - Always overlay */}
-        <div className={`absolute left-0 top-0 bottom-0 bg-gray-800/95 backdrop-blur-sm text-white transition-transform duration-300 z-40 shadow-2xl w-80 ${
-          leftDrawerOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}>
+        <div className={`absolute left-0 top-0 bottom-0 bg-gray-900/60 backdrop-blur-md border-r border-white/10 text-white transition-transform duration-300 z-40 shadow-2xl w-80 ${leftDrawerOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}>
           <button
             onClick={toggleLeftDrawer}
             className="absolute top-2 right-2 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors z-50"
             aria-label="Закрыть панель"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
           </button>
           <SidebarLeft />
         </div>
 
         {/* Right Sidebar - Always overlay */}
-        <div className={`absolute right-0 top-0 bottom-0 bg-gray-800/95 backdrop-blur-sm text-white transition-transform duration-300 z-40 shadow-2xl w-80 ${
-          rightDrawerOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}>
+        <div className={`absolute right-0 top-0 bottom-0 bg-gray-900/60 backdrop-blur-md border-l border-white/10 text-white transition-transform duration-300 z-40 shadow-2xl w-80 ${rightDrawerOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}>
           <button
             onClick={toggleRightDrawer}
             className="absolute top-2 left-2 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors z-50"
             aria-label="Закрыть панель"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
           </button>
           <SidebarRight />
         </div>
@@ -416,7 +405,7 @@ function App() {
             className="absolute left-2 top-1/2 -translate-y-1/2 z-35 p-3 bg-gray-800/90 hover:bg-gray-700 rounded-r-lg shadow-lg text-white backdrop-blur-sm"
             aria-label="Открыть панель управления"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
           </button>
         )}
 
@@ -427,7 +416,7 @@ function App() {
             className="absolute right-2 top-1/2 -translate-y-1/2 z-35 p-3 bg-gray-800/90 hover:bg-gray-700 rounded-l-lg shadow-lg text-white backdrop-blur-sm"
             aria-label="Открыть историю"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
           </button>
         )}
 
@@ -439,7 +428,7 @@ function App() {
             </div>
           </div>
         )}
-        
+
         {/* Initialization message */}
         {!isInitialized && (
           <div className="absolute inset-0 bg-gray-900 flex items-center justify-center text-white z-10">
@@ -456,7 +445,7 @@ function App() {
           >
             {isRolling ? 'Бросаю...' : 'БРОСИТЬ'}
           </button>
-          
+
           <button
             onPointerDown={(e) => {
               e.preventDefault();
@@ -464,11 +453,11 @@ function App() {
               setIsRolling(true);
               const startTime = Date.now();
               const holdInterval = setInterval(() => {
-                const elapsed = Date.now() - startTime;
-                const power = Math.min(elapsed / 1500, 1);
+                // const elapsed = Date.now() - startTime;
+                // const power = Math.min(elapsed / 1500, 1);
                 // Visual feedback можно добавить позже
               }, 16);
-              
+
               const handlePointerUp = () => {
                 clearInterval(holdInterval);
                 const holdTime = Date.now() - startTime;
@@ -477,7 +466,7 @@ function App() {
                 document.removeEventListener('pointerup', handlePointerUp);
                 document.removeEventListener('pointercancel', handlePointerUp);
               };
-              
+
               document.addEventListener('pointerup', handlePointerUp);
               document.addEventListener('pointercancel', handlePointerUp);
             }}
@@ -486,8 +475,8 @@ function App() {
             title="Кинуть одну (удерживайте для силы)"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <circle cx="12" cy="12" r="1" fill="currentColor"/>
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="12" cy="12" r="1" fill="currentColor" />
             </svg>
           </button>
         </div>

@@ -49,12 +49,12 @@ export class Renderer3D {
     this.scene.background = new THREE.Color(0x1a1a2e);
 
     this.camera = new THREE.PerspectiveCamera(
-      50,
+      45,
       canvas.clientWidth / canvas.clientHeight,
       0.1,
       1000
     );
-    this.camera.position.set(0, 8, 12);
+    this.camera.position.set(0, 20, 0);
     this.camera.lookAt(0, 0, 0);
 
     this.renderer = new THREE.WebGLRenderer({
@@ -143,27 +143,48 @@ export class Renderer3D {
     const faceNormals = this.faceNormals.get(type);
     if (!faceNormals) return;
 
-    // Create number sprites for each face
+    // Create number planes for each face
     for (let i = 0; i < Math.min(sides, faceNormals.length); i++) {
       const number = i + 1;
-      const texture = this.createNumberTexture(number, '#ffffff');
+      const texture = this.createNumberTexture(number, '#ffffff'); // Standard white text
       
-      const spriteMaterial = new THREE.SpriteMaterial({ 
+      const planeMaterial = new THREE.MeshBasicMaterial({ 
         map: texture,
         transparent: true,
+        opacity: 0.9,
         depthTest: true,
-        depthWrite: false
+        depthWrite: false,
+        side: THREE.DoubleSide
       });
       
-      const sprite = new THREE.Sprite(spriteMaterial);
-      sprite.scale.set(0.5, 0.5, 1);
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), planeMaterial);
       
-      // Position sprite on face
+      // Position plane on face
       const normal = faceNormals[i].normal.clone();
-      const distance = type === 'd6' ? 0.75 : 0.65;
-      sprite.position.copy(normal.multiplyScalar(distance));
       
-      mesh.add(sprite);
+      // Fine tune distance for different dice to avoid z-fighting but stick close
+      let distance = 0.51; // base distance from center (unit radius approx 0.5)
+      
+      // Adjust based on geometry type
+      switch(type) {
+        case 'd4': distance = 0.45; break; // Tetrahedron faces are close
+        case 'd6': distance = 0.71; break; // Box face is at 0.7
+        case 'd8': distance = 0.65; break;
+        case 'd10': distance = 0.65; break; // Custom D10 radius varies
+        case 'd12': distance = 0.95; break;
+        case 'd20': distance = 0.95; break;
+      }
+
+      const pos = normal.clone().multiplyScalar(distance);
+      plane.position.copy(pos);
+      
+      // Orient plane to face normal
+      plane.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+      
+      // Rotate 180 degrees if needed (some numbers might be upside down)
+      // For now, let's keep it simple. We might need specific orientations for D4/D10 etc.
+      
+      mesh.add(plane);
     }
   }
 
@@ -240,7 +261,53 @@ export class Renderer3D {
       case 'd8':
         return new THREE.OctahedronGeometry(1.3, 0);
       case 'd10':
-        return new THREE.ConeGeometry(1.2, 2, 10);
+        // Pentagonal Bipyramid (approximation for Trapezohedron)
+        // Two cones back to back
+        // Top cone
+        const topCone = new THREE.ConeGeometry(1, 1, 5);
+        topCone.translate(0, 0.5, 0);
+        // Bottom cone
+        const bottomCone = new THREE.ConeGeometry(1, 1, 5);
+        bottomCone.rotateX(Math.PI);
+        bottomCone.translate(0, -0.5, 0);
+        // Merge
+        // Since we can't easily merge efficiently without utilities, let's use a custom BufferGeometry
+        // Or simpler: Just use a custom Polyhedron if we had points.
+        // Let's stick to a single Dipyramid constructed manually or via merging.
+        // Actually, let's just use a tall cone for now but better scaled, OR the Dipyramid approach by just returning one Geometry that comprises both.
+        // THREE.js geometries are hard to merge without Utils.BufferGeometryUtils.
+        // Let's try to make a raw D10 geometry manually.
+        const vertices = [
+          0, 1.2, 0,   // Top
+          0, -1.2, 0,  // Bottom
+        ];
+        // 5 equitorial points
+        for(let i=0; i<5; i++) {
+          const angle = (i / 5) * Math.PI * 2;
+          vertices.push(Math.sin(angle), 0, Math.cos(angle));
+        }
+        
+        const indices = [
+          // Top Fan
+          0, 2, 3,
+          0, 3, 4,
+          0, 4, 5,
+          0, 5, 6,
+          0, 6, 2,
+          // Bottom Fan
+          1, 3, 2,
+          1, 4, 3,
+          1, 5, 4,
+          1, 6, 5,
+          1, 2, 6
+        ];
+        
+        const d10Geo = new THREE.BufferGeometry();
+        d10Geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        d10Geo.setIndex(indices);
+        d10Geo.computeVertexNormals();
+        return d10Geo;
+        
       case 'd12':
         return new THREE.DodecahedronGeometry(1.2, 0);
       case 'd20':
@@ -295,7 +362,10 @@ export class Renderer3D {
     filter: (normal: THREE.Vector3) => boolean
   ): THREE.Vector3[] {
     // Only convert to non-indexed if it's indexed
-    const geom = geometry.index ? geometry.toNonIndexed() : geometry;
+    // const geom = geometry.index ? geometry.toNonIndexed() : geometry;
+    // For manual D10, we might need to be careful.
+    // Let's try to just get normals from faces using normal attribute or logic.
+    const geom = geometry.toNonIndexed(); // Ensure we have raw triangles
     const position = geom.getAttribute('position');
     const normals: THREE.Vector3[] = [];
     const normalMap = new Map<string, THREE.Vector3>();
