@@ -31,8 +31,6 @@ export class Renderer3D {
   private materials: Map<DieType, THREE.Material> = new Map();
   private faceNormals: Map<DieType, FaceNormal[]> = new Map();
   private animationId: number | null = null;
-  private isIdle = false;
-  private lastActiveTime = 0;
   private settleCallback?: (results: { type: DieType; value: number }[]) => void;
   private resultByPhysics = false;
 
@@ -106,33 +104,33 @@ export class Renderer3D {
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d')!;
-    
+
     // Background
     if (typeof bgColor === 'number') {
       ctx.fillStyle = `#${bgColor.toString(16).padStart(6, '0')}`;
       ctx.fillRect(0, 0, size, size);
-      
+
       // Border
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 4;
       ctx.strokeRect(2, 2, size - 4, size - 4);
-      
+
       // Number
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 72px Arial';
     } else {
       // Clear background for transparent
       ctx.clearRect(0, 0, size, size);
-      
+
       // Draw text
       ctx.fillStyle = bgColor;
       ctx.font = 'bold 80px Arial';
     }
-    
+
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(number.toString(), size / 2, size / 2);
-    
+
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
     return texture;
@@ -147,43 +145,47 @@ export class Renderer3D {
     for (let i = 0; i < Math.min(sides, faceNormals.length); i++) {
       const number = i + 1;
       const texture = this.createNumberTexture(number, '#ffffff'); // Standard white text
-      
-      const planeMaterial = new THREE.MeshBasicMaterial({ 
+
+      const planeMaterial = new THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
         opacity: 0.9,
         depthTest: true,
         depthWrite: false,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -1, // Pull forward
+        polygonOffsetUnits: -1
       });
-      
+
       const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), planeMaterial);
-      
+
       // Position plane on face
       const normal = faceNormals[i].normal.clone();
-      
-      // Fine tune distance for different dice to avoid z-fighting but stick close
-      let distance = 0.51; // base distance from center (unit radius approx 0.5)
-      
-      // Adjust based on geometry type
-      switch(type) {
-        case 'd4': distance = 0.45; break; // Tetrahedron faces are close
-        case 'd6': distance = 0.71; break; // Box face is at 0.7
+
+      // Fine tune distance for different dice
+      let distance = 0.51; // base
+
+      switch (type) {
+        case 'd2': distance = 0.2; break; // Coin face
+        case 'd4': distance = 0.45; break;
+        case 'd5': distance = 0.81; break; // Prism
+        case 'd6': distance = 0.71; break;
         case 'd8': distance = 0.65; break;
-        case 'd10': distance = 0.65; break; // Custom D10 radius varies
+        case 'd10': distance = 0.95; break; // Adjusted for new geometry
         case 'd12': distance = 0.95; break;
         case 'd20': distance = 0.95; break;
       }
 
       const pos = normal.clone().multiplyScalar(distance);
       plane.position.copy(pos);
-      
+
       // Orient plane to face normal
       plane.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
-      
+
       // Rotate 180 degrees if needed (some numbers might be upside down)
       // For now, let's keep it simple. We might need specific orientations for D4/D10 etc.
-      
+
       mesh.add(plane);
     }
   }
@@ -191,7 +193,9 @@ export class Renderer3D {
 
   private initMaterials() {
     const colors = {
+      d2: 0xfbbf24,    // Gold
       d4: 0x16537e,    // Blue
+      d5: 0xbe185d,    // Pink
       d6: 0x7c3aed,    // Purple  
       d8: 0x059669,    // Green
       d10: 0xdc2626,   // Red
@@ -202,7 +206,7 @@ export class Renderer3D {
     Object.entries(colors).forEach(([type, color]) => {
       // Create a simple colored material without textures for now
       // Numbers will be added as text sprites later
-      this.materials.set(type as DieType, new THREE.MeshLambertMaterial({ 
+      this.materials.set(type as DieType, new THREE.MeshLambertMaterial({
         color,
         transparent: true,
         opacity: 0.9
@@ -215,7 +219,7 @@ export class Renderer3D {
   private setupTable() {
     // Visual table
     const tableGeometry = new THREE.PlaneGeometry(20, 20);
-    this.tableMaterial = new THREE.MeshLambertMaterial({ 
+    this.tableMaterial = new THREE.MeshLambertMaterial({
       color: 0x2d3748,
       transparent: true,
       opacity: 0.8
@@ -235,12 +239,12 @@ export class Renderer3D {
     const wallHeight = 8; // Increased to prevent dice from flying out
     const wallThickness = 1;
     const tableSize = 10;
-    
+
     const walls = [
-      { pos: [0, wallHeight/2, -tableSize] as [number, number, number], size: [tableSize, wallHeight/2, wallThickness] as [number, number, number] },
-      { pos: [0, wallHeight/2, tableSize] as [number, number, number], size: [tableSize, wallHeight/2, wallThickness] as [number, number, number] },
-      { pos: [-tableSize, wallHeight/2, 0] as [number, number, number], size: [wallThickness, wallHeight/2, tableSize] as [number, number, number] },
-      { pos: [tableSize, wallHeight/2, 0] as [number, number, number], size: [wallThickness, wallHeight/2, tableSize] as [number, number, number] }
+      { pos: [0, wallHeight / 2, -tableSize] as [number, number, number], size: [tableSize, wallHeight / 2, wallThickness] as [number, number, number] },
+      { pos: [0, wallHeight / 2, tableSize] as [number, number, number], size: [tableSize, wallHeight / 2, wallThickness] as [number, number, number] },
+      { pos: [-tableSize, wallHeight / 2, 0] as [number, number, number], size: [wallThickness, wallHeight / 2, tableSize] as [number, number, number] },
+      { pos: [tableSize, wallHeight / 2, 0] as [number, number, number], size: [wallThickness, wallHeight / 2, tableSize] as [number, number, number] }
     ];
 
     walls.forEach(wall => {
@@ -254,60 +258,54 @@ export class Renderer3D {
 
   private createDieGeometry(type: DieType): THREE.BufferGeometry {
     switch (type) {
+      case 'd2':
+        return new THREE.CylinderGeometry(1.2, 1.2, 0.2, 32);
       case 'd4':
         return new THREE.TetrahedronGeometry(1.2, 0);
+      case 'd5':
+        // Triangular prism
+        // Create a cylinder with 3 sides
+        return new THREE.CylinderGeometry(1, 1, 2, 3);
       case 'd6':
         return new THREE.BoxGeometry(1.4, 1.4, 1.4);
       case 'd8':
         return new THREE.OctahedronGeometry(1.3, 0);
       case 'd10':
-        // Pentagonal Bipyramid (approximation for Trapezohedron)
-        // Two cones back to back
-        // Top cone
-        const topCone = new THREE.ConeGeometry(1, 1, 5);
-        topCone.translate(0, 0.5, 0);
-        // Bottom cone
-        const bottomCone = new THREE.ConeGeometry(1, 1, 5);
-        bottomCone.rotateX(Math.PI);
-        bottomCone.translate(0, -0.5, 0);
-        // Merge
-        // Since we can't easily merge efficiently without utilities, let's use a custom BufferGeometry
-        // Or simpler: Just use a custom Polyhedron if we had points.
-        // Let's stick to a single Dipyramid constructed manually or via merging.
-        // Actually, let's just use a tall cone for now but better scaled, OR the Dipyramid approach by just returning one Geometry that comprises both.
-        // THREE.js geometries are hard to merge without Utils.BufferGeometryUtils.
-        // Let's try to make a raw D10 geometry manually.
-        const vertices = [
-          0, 1.2, 0,   // Top
-          0, -1.2, 0,  // Bottom
-        ];
-        // 5 equitorial points
-        for(let i=0; i<5; i++) {
-          const angle = (i / 5) * Math.PI * 2;
-          vertices.push(Math.sin(angle), 0, Math.cos(angle));
-        }
-        
+        // Improved D10 - Pentagonal Trapezohedron approximation using Dipyramid
+        // Vertices for a pentagonal dipyramid
+        const radius = 1;
+        const height = 1.2;
+
+        // Faces
         const indices = [
-          // Top Fan
-          0, 2, 3,
-          0, 3, 4,
-          0, 4, 5,
-          0, 5, 6,
-          0, 6, 2,
-          // Bottom Fan
-          1, 3, 2,
-          1, 4, 3,
-          1, 5, 4,
-          1, 6, 5,
-          1, 2, 6
+          // Top faces
+          0, 3, 2,
+          0, 4, 3,
+          0, 5, 4,
+          0, 6, 5,
+          0, 2, 6,
+          // Bottom faces
+          1, 2, 3,
+          1, 3, 4,
+          1, 4, 5,
+          1, 5, 6,
+          1, 6, 2
         ];
-        
+
         const d10Geo = new THREE.BufferGeometry();
-        d10Geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        d10Geo.setAttribute('position', new THREE.Float32BufferAttribute([
+          0, height, 0, // 0: Top
+          0, -height, 0, // 1: Bottom
+          Math.sin(0) * radius, 0, Math.cos(0) * radius, // 2
+          Math.sin(Math.PI * 0.4) * radius, 0, Math.cos(Math.PI * 0.4) * radius, // 3
+          Math.sin(Math.PI * 0.8) * radius, 0, Math.cos(Math.PI * 0.8) * radius, // 4
+          Math.sin(Math.PI * 1.2) * radius, 0, Math.cos(Math.PI * 1.2) * radius, // 5
+          Math.sin(Math.PI * 1.6) * radius, 0, Math.cos(Math.PI * 1.6) * radius, // 6
+        ], 3));
         d10Geo.setIndex(indices);
         d10Geo.computeVertexNormals();
         return d10Geo;
-        
+
       case 'd12':
         return new THREE.DodecahedronGeometry(1.2, 0);
       case 'd20':
@@ -319,34 +317,21 @@ export class Renderer3D {
 
   private createDieMaterials(type: DieType): THREE.Material | THREE.Material[] {
     const baseColor = (this.materials.get(type) as THREE.MeshLambertMaterial)?.color.getHex() || 0x808080;
-    
-    if (type === 'd6') {
-      // Create materials with numbers for each face of d6
-      const materials: THREE.Material[] = [];
-      for (let i = 1; i <= 6; i++) {
-        const texture = this.createNumberTexture(i, baseColor);
-        materials.push(new THREE.MeshLambertMaterial({ 
-          map: texture,
-          transparent: true,
-          opacity: 0.9
-        }));
-      }
-      return materials;
-    }
-    
-    // For other dice, use simple colored material
+
+    // For all dice, use simple colored material
     return this.materials.get(type) || new THREE.MeshLambertMaterial({ color: baseColor });
   }
 
   private buildFaceNormals(): void {
-    const diceTypes: DieType[] = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
+    const diceTypes: DieType[] = ['d2', 'd4', 'd5', 'd6', 'd8', 'd10', 'd12', 'd20'];
     diceTypes.forEach((type) => {
       const geometry = this.createDieGeometry(type);
       const normals = this.extractFaceNormals(geometry, (normal) => {
-        if (type === 'd10') {
-          return normal.y > -0.6;
+        if (type === 'd2') {
+          return Math.abs(normal.y) > 0.9; // Only top/bottom
         }
-        return true;
+        // For D5 and D10, we want all faces
+        return true; // All faces for others
       });
       const values = normals.map((normal, index) => ({
         normal,
@@ -394,40 +379,86 @@ export class Renderer3D {
     const mass = 1;
 
     switch (type) {
-      case 'd4':
-      case 'd8':
-      case 'd12':
-      case 'd20':
-        // Use sphere approximation for complex polyhedra (performance)
-        shape = new CANNON.Sphere(1.2);
+      case 'd2':
+        // Cylinder for coin
+        shape = new CANNON.Cylinder(1.2, 1.2, 0.2, 16);
+        // Fix cylinder orientation (CANNON cylinder is along Z axis, we usually want Y)
+        // We handle rotation in body added to shape usually, or just rotate the body
         break;
       case 'd6':
         shape = new CANNON.Box(new CANNON.Vec3(0.7, 0.7, 0.7));
         break;
-      case 'd10':
-        shape = new CANNON.Cylinder(1.2, 1.2, 2, 8);
-        break;
       default:
-        shape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+        // Use ConvexPolyhedron for all other dice for accurate rolling
+        const geometry = this.createDieGeometry(type);
+        shape = this.createConvexPolyhedron(geometry);
     }
 
     const body = new CANNON.Body({ mass });
-    body.addShape(shape);
-    body.material = new CANNON.Material({ friction: 0.4, restitution: 0.3 });
-    
+
+    // Rotate cylinder shape to match visual if needed
+    if (type === 'd2') {
+      const q = new CANNON.Quaternion();
+      q.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+      body.addShape(shape, new CANNON.Vec3(0, 0, 0), q);
+    } else if (type === 'd5') {
+      // Rotate prism to stand up? Visual is Y-up cylinder
+      // CANNON Cylinder is Z-up. Our visual is Y-up.
+      // But we generate ConvexPoly for D5 from THREE geometry which is Y-up.
+      // So ConvexPoly should match visual automatically.
+      body.addShape(shape);
+    } else {
+      body.addShape(shape);
+    }
+
+    body.material = new CANNON.Material({ friction: 0.01, restitution: 0.5 }); // Lower friction for better rolling
+    body.linearDamping = 0.1;
+    body.angularDamping = 0.1;
+
     return body;
+  }
+
+  private createConvexPolyhedron(geometry: THREE.BufferGeometry): CANNON.ConvexPolyhedron {
+    const geo = geometry.toNonIndexed();
+    const position = geo.getAttribute('position');
+    const faces: number[][] = [];
+
+    // Extract unique vertices
+    const uniqueVerts: CANNON.Vec3[] = [];
+    const vertMap: Record<string, number> = {};
+
+    const getVertIndex = (x: number, y: number, z: number) => {
+      const key = `${x.toFixed(4)},${y.toFixed(4)},${z.toFixed(4)}`;
+      if (vertMap[key] !== undefined) return vertMap[key];
+      const v = new CANNON.Vec3(x, y, z);
+      uniqueVerts.push(v);
+      vertMap[key] = uniqueVerts.length - 1;
+      return uniqueVerts.length - 1;
+    };
+
+    for (let i = 0; i < position.count; i += 3) {
+      const a = getVertIndex(position.getX(i), position.getY(i), position.getZ(i));
+      const b = getVertIndex(position.getX(i + 1), position.getY(i + 1), position.getZ(i + 1));
+      const c = getVertIndex(position.getX(i + 2), position.getY(i + 2), position.getZ(i + 2));
+      faces.push([a, b, c]);
+    }
+
+    return new CANNON.ConvexPolyhedron({
+      vertices: uniqueVerts,
+      faces: faces
+    });
   }
 
   public addDie(type: DieType, position: THREE.Vector3, throwForce: number, spinForce: number, prerollValue?: number): void {
     const geometry = this.createDieGeometry(type);
     const material = this.createDieMaterials(type);
     const mesh = new THREE.Mesh(geometry, material);
-    
+
     // Add number decals
     this.addNumberDecals(mesh, type);
-    
+
     const body = this.createDieBody(type);
-    
+
     // Set position
     mesh.position.copy(position);
     body.position.set(position.x, position.y, position.z);
@@ -441,7 +472,7 @@ export class Renderer3D {
     mesh.setRotationFromEuler(rotation);
     body.quaternion.set(
       rotation.x,
-      rotation.y, 
+      rotation.y,
       rotation.z,
       1
     ).normalize();
@@ -452,7 +483,7 @@ export class Renderer3D {
       -0.3,
       (Math.random() - 0.5) * 0.5
     ).normalize().multiplyScalar(throwForce * 0.1);
-    
+
     body.velocity.set(throwDirection.x, throwDirection.y, throwDirection.z);
 
     // Apply spin
@@ -475,7 +506,7 @@ export class Renderer3D {
     this.dice.push(die);
     this.scene.add(mesh);
     this.world.addBody(body);
-    
+
     this.isIdle = false;
     this.lastActiveTime = Date.now();
   }
@@ -500,7 +531,7 @@ export class Renderer3D {
       const velocity = die.body.velocity.length();
       const angularVelocity = die.body.angularVelocity.length();
       const timeElapsed = now - die.spawnTime;
-      
+
       // Force settle after timeout
       if (timeElapsed > maxWaitTime) {
         die.settled = true;
@@ -523,7 +554,7 @@ export class Renderer3D {
         type: die.type,
         value: this.getDieValue(die)
       }));
-      
+
       this.settleCallback(results);
       this.settleCallback = undefined;
     }
@@ -555,30 +586,17 @@ export class Renderer3D {
   private startRenderLoop(): void {
     const render = () => {
       this.animationId = requestAnimationFrame(render);
-      
-      const now = Date.now();
-      const deltaTime = 1/60; // Fixed timestep for physics
-      
+
+      const deltaTime = 1 / 60; // Fixed timestep for physics
+
       // Update physics
       this.world.step(deltaTime);
-      
+
       // Update mesh positions
-      let hasMovement = false;
       this.dice.forEach(die => {
         die.mesh.position.copy(die.body.position as any);
         die.mesh.quaternion.copy(die.body.quaternion as any);
-        
-        if (die.body.velocity.length() > 0.01 || die.body.angularVelocity.length() > 0.01) {
-          hasMovement = true;
-        }
       });
-
-      if (hasMovement) {
-        this.lastActiveTime = now;
-        this.isIdle = false;
-      } else if (now - this.lastActiveTime > 1000) {
-        this.isIdle = true;
-      }
 
       this.checkSettled();
       this.controls.update();
@@ -638,7 +656,7 @@ export class Renderer3D {
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
     }
-    
+
     this.clearDice();
     this.controls.dispose();
     this.renderer.dispose();

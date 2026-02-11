@@ -24,8 +24,10 @@ export class Renderer2D {
   private backgroundReady = false;
 
   private colors: Record<DieType, string> = {
+    d2: '#fbbf24', // Gold
     d4: '#16537e',
-    d6: '#7c3aed', 
+    d5: '#be185d', // Pink
+    d6: '#7c3aed',
     d8: '#059669',
     d10: '#dc2626',
     d12: '#ea580c',
@@ -75,13 +77,13 @@ export class Renderer2D {
     const spacing = 80;
     const rows = Math.ceil(Math.sqrt(dice.length));
     const cols = Math.ceil(dice.length / rows);
-    
+
     dice.forEach((die, index) => {
       const row = Math.floor(index / cols);
       const col = index % cols;
       const offsetX = (col - (cols - 1) / 2) * spacing;
       const offsetY = (row - (rows - 1) / 2) * spacing;
-      
+
       this.dice.push({
         type: die.type,
         value: die.value,
@@ -102,14 +104,14 @@ export class Renderer2D {
   private startAnimation(): void {
     this.isAnimating = true;
     let startTime = Date.now();
-    
+
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const duration = 1500;
       const progress = Math.min(elapsed / duration, 1);
-      
+
       this.clear();
-      
+
       // Animation phases
       if (progress < 0.7) {
         // Rolling phase
@@ -128,7 +130,7 @@ export class Renderer2D {
           this.drawDie(die, settleProgress);
         });
       }
-      
+
       if (progress < 1) {
         this.animationId = requestAnimationFrame(animate);
       } else {
@@ -143,7 +145,7 @@ export class Renderer2D {
         }
       }
     };
-    
+
     animate();
   }
 
@@ -170,15 +172,15 @@ export class Renderer2D {
     this.ctx.rotate(die.rotation);
     this.ctx.scale(die.scale, die.scale);
     this.ctx.globalAlpha = die.alpha;
-    
+
     // Draw spinning shape
     this.ctx.fillStyle = die.color;
-    this.ctx.fillRect(-25, -25, 50, 50);
-    
+    this.drawDieShape(die.type);
+
     this.ctx.strokeStyle = '#ffffff';
     this.ctx.lineWidth = 2;
-    this.ctx.strokeRect(-25, -25, 50, 50);
-    
+    this.drawDieShape(die.type, true);
+
     this.ctx.restore();
   }
 
@@ -188,31 +190,38 @@ export class Renderer2D {
     this.ctx.translate(die.x, die.y);
     this.ctx.scale(die.scale, die.scale);
     this.ctx.globalAlpha = die.alpha;
-    
+
     // Draw die background
     this.ctx.fillStyle = die.color;
     this.drawDieShape(die.type);
-    
+
     // Draw border
     this.ctx.strokeStyle = '#ffffff';
     this.ctx.lineWidth = 3;
     this.drawDieShape(die.type, true);
-    
+
     // Draw value
     if (settleProgress > 0.5) {
       this.ctx.fillStyle = '#ffffff';
       this.ctx.font = 'bold 24px monospace';
       this.ctx.fillText(die.value.toString(), 0, 0);
     }
-    
+
     this.ctx.restore();
   }
 
   private drawDieShape(type: DieType, stroke = false): void {
     if (!this.ctx) return;
     const size = 30;
-    
+
     switch (type) {
+      case 'd2':
+        // Circle (Coin)
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, size, 0, Math.PI * 2);
+        this.ctx.closePath();
+        break;
+
       case 'd4':
         // Triangle
         this.ctx.beginPath();
@@ -221,7 +230,20 @@ export class Renderer2D {
         this.ctx.lineTo(size * 0.866, size * 0.5);
         this.ctx.closePath();
         break;
-      
+
+      case 'd5':
+        // Pentagon (using similar logic to d10 but simpler)
+        this.ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const angle = (i * Math.PI * 2) / 5 - Math.PI / 2;
+          const x = Math.cos(angle) * size;
+          const y = Math.sin(angle) * size;
+          if (i === 0) this.ctx.moveTo(x, y);
+          else this.ctx.lineTo(x, y);
+        }
+        this.ctx.closePath();
+        break;
+
       case 'd6':
         // Square
         if (stroke) {
@@ -230,7 +252,7 @@ export class Renderer2D {
           this.ctx.fillRect(-size, -size, size * 2, size * 2);
         }
         return;
-      
+
       case 'd8':
         // Diamond
         this.ctx.beginPath();
@@ -240,7 +262,7 @@ export class Renderer2D {
         this.ctx.lineTo(-size, 0);
         this.ctx.closePath();
         break;
-      
+
       case 'd10':
         // Pentagon
         this.ctx.beginPath();
@@ -253,7 +275,7 @@ export class Renderer2D {
         }
         this.ctx.closePath();
         break;
-      
+
       case 'd12':
         // Dodecagon
         this.ctx.beginPath();
@@ -266,7 +288,7 @@ export class Renderer2D {
         }
         this.ctx.closePath();
         break;
-      
+
       case 'd20':
         // Circle (approximating icosahedron)
         this.ctx.beginPath();
@@ -274,7 +296,7 @@ export class Renderer2D {
         this.ctx.closePath();
         break;
     }
-    
+
     if (stroke) {
       this.ctx.stroke();
     } else {

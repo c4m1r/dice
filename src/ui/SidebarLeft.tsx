@@ -1,12 +1,14 @@
 import { useState, useRef } from 'react';
-import { Info, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6 } from 'lucide-react';
+import { Info, Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Coins } from 'lucide-react';
 import { useAppStore } from '../app/store';
 import { DieType } from '../app/types';
 import { getTotalDiceCount } from '../engine/diceEngine';
 import { useRollActions } from '../app/rollActions';
 
 const diceInfo: Record<DieType, { icon: any; name: string; description: string }> = {
+  d2: { icon: Coins, name: 'D2', description: 'Монета (2 стороны)' },
   d4: { icon: Dice1, name: 'D4', description: 'Тетраэдр (4 грани)' },
+  d5: { icon: Dice5, name: 'D5', description: 'Пятигранник (5 граней)' },
   d6: { icon: Dice6, name: 'D6', description: 'Куб (6 граней)' },
   d8: { icon: Dice2, name: 'D8', description: 'Октаэдр (8 граней)' },
   d10: { icon: Dice3, name: 'D10', description: 'Десятигранник (10 граней)' },

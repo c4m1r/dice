@@ -1,4 +1,4 @@
-export type DieType = 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20';
+export type DieType = 'd2' | 'd4' | 'd5' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20';
 export type Language = 'ru' | 'en' | 'ko' | 'zh' | 'es' | 'ja';
 
 export type TableBackgroundSetting =
@@ -6,7 +6,9 @@ export type TableBackgroundSetting =
   | { type: 'custom'; dataUrl: string };
 
 export interface DicePool {
+  d2: number;
   d4: number;
+  d5: number;
   d6: number;
   d8: number;
   d10: number;

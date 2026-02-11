@@ -161,13 +161,13 @@ function App() {
 
       switch (settings.divinationSubMode) {
         case 'one-die':
-          poolForRoll = { d20: 4, d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, modifier: 0 };
+          poolForRoll = { d20: 4, d2: 0, d4: 0, d5: 0, d6: 0, d8: 0, d10: 0, d12: 0, modifier: 0 };
           break;
         case 'two-dice':
-          poolForRoll = { d6: 2, d4: 0, d8: 0, d10: 0, d12: 0, d20: 0, modifier: 0 };
+          poolForRoll = { d6: 2, d2: 0, d4: 0, d5: 0, d8: 0, d10: 0, d12: 0, d20: 0, modifier: 0 };
           break;
         case 'three-dice':
-          poolForRoll = { d6: 3, d4: 0, d8: 0, d10: 0, d12: 0, d20: 0, modifier: 0 };
+          poolForRoll = { d6: 3, d2: 0, d4: 0, d5: 0, d8: 0, d10: 0, d12: 0, d20: 0, modifier: 0 };
           break;
       }
     }
@@ -288,7 +288,7 @@ function App() {
   const performSingleRoll = useCallback((power: number) => {
     const die = lastSelectedDie || 'd20';
     const singlePool = {
-      d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0,
+      d2: 0, d4: 0, d5: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0,
       [die]: 1,
       modifier: 0
     };

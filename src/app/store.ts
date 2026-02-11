@@ -3,7 +3,9 @@ import { AppState, DicePool, RollEvent, AppSettings, DieType, Language } from '.
 import { loadSettings, saveSettings, loadHistory, saveHistory } from './persistence';
 
 const defaultPool: DicePool = {
+  d2: 0,
   d4: 0,
+  d5: 0,
   d6: 0,
   d8: 0,
   d10: 0,
