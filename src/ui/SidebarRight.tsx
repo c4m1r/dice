@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Copy, RotateCcw } from 'lucide-react';
 import { useAppStore } from '../app/store';
 import { RollEvent } from '../app/types';
@@ -67,7 +67,7 @@ export const SidebarRight: React.FC = () => {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto space-y-3">
+        <div className="flex-1 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent pr-2">
           {history.length === 0 ? (
             <p className="text-gray-400 text-center py-8">История пуста</p>
           ) : (

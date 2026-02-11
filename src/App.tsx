@@ -450,19 +450,65 @@ function App() {
             onPointerDown={(e) => {
               e.preventDefault();
               if (isRolling) return;
+
+              // Check constraints
+              const currentCount = renderer3DRef.current?.getDiceCount() ?? getTotalDiceCount(pool);
+              if (currentCount >= settings.maxDiceOnTable) {
+                alert(`Максимум костей: ${settings.maxDiceOnTable}`);
+                return;
+              }
+
               setIsRolling(true);
+              const die = lastSelectedDie || 'd20';
+
+              if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
+                renderer3DRef.current.spawnSuspendedDie(die);
+              }
+
               const startTime = Date.now();
-              const holdInterval = setInterval(() => {
-                // const elapsed = Date.now() - startTime;
-                // const power = Math.min(elapsed / 1500, 1);
-                // Visual feedback можно добавить позже
-              }, 16);
 
               const handlePointerUp = () => {
-                clearInterval(holdInterval);
                 const holdTime = Date.now() - startTime;
                 const power = Math.min(holdTime / 1500, 1);
-                performSingleRoll(power);
+
+                if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
+                  renderer3DRef.current.onSettled((results) => {
+                    const finalTotal = calculateTotal(results, pool.modifier);
+
+                    // Reconstruct pool from results
+                    const newPool: DicePool = {
+                      d2: 0, d4: 0, d5: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0,
+                      modifier: pool.modifier
+                    };
+
+                    results.forEach(r => {
+                      if (typeof newPool[r.type] === 'number') {
+                        newPool[r.type]++;
+                      }
+                    });
+
+                    const event = {
+                      id: generateRollId(),
+                      timestamp: Date.now(),
+                      mode: settings.mode as 'roll' | 'divination',
+                      view: settings.view,
+                      subMode: 'manual',
+                      pool: newPool,
+                      results,
+                      total: finalTotal
+                    };
+                    addToHistory(event);
+                    setIsRolling(false);
+                  });
+
+                  const throwForce = settings.throwForce * (0.4 + 1.2 * power);
+                  const spinForce = settings.spinForce;
+                  renderer3DRef.current.releaseSuspendedDice(throwForce, spinForce);
+                } else {
+                  // Fallback for 2D 
+                  performSingleRoll(power);
+                }
+
                 document.removeEventListener('pointerup', handlePointerUp);
                 document.removeEventListener('pointercancel', handlePointerUp);
               };

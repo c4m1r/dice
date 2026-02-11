@@ -11,6 +11,7 @@ interface Die3D {
   settleFrames: number;
   prerollValue?: number;
   spawnTime: number;
+  suspended: boolean;
 }
 
 interface FaceNormal {
@@ -500,15 +501,79 @@ export class Renderer3D {
       settled: false,
       settleFrames: 0,
       prerollValue,
-      spawnTime: Date.now()
+      spawnTime: Date.now(),
+      suspended: false
     };
 
     this.dice.push(die);
     this.scene.add(mesh);
     this.world.addBody(body);
+  }
 
-    this.isIdle = false;
-    this.lastActiveTime = Date.now();
+  public spawnSuspendedDie(type: DieType): void {
+    // Spawn high above center
+    const position = new THREE.Vector3(0, 15, 0);
+
+    const geometry = this.createDieGeometry(type);
+    const material = this.createDieMaterials(type);
+    const mesh = new THREE.Mesh(geometry, material);
+    this.addNumberDecals(mesh, type);
+
+    // Create static body initially (mass=0)
+    const body = this.createDieBody(type);
+    body.mass = 0;
+    body.type = CANNON.Body.STATIC; // Or KINEMATIC if we want to move it
+    body.position.set(position.x, position.y, position.z);
+
+    mesh.position.copy(position);
+
+    const die: Die3D = {
+      mesh,
+      body,
+      type,
+      settled: false,
+      settleFrames: 0,
+      spawnTime: Date.now(),
+      suspended: true
+    };
+
+    this.dice.push(die);
+    this.scene.add(mesh);
+    this.world.addBody(body);
+  }
+
+  public releaseSuspendedDice(throwForce: number, spinForce: number): void {
+    let releasedCount = 0;
+    this.dice.forEach(die => {
+      if (die.suspended) {
+        die.suspended = false;
+        die.body.mass = 1;
+        die.body.type = CANNON.Body.DYNAMIC;
+        die.body.updateMassProperties();
+        die.spawnTime = Date.now(); // Reset timer for settling
+
+        // Apply force
+        const throwDirection = new THREE.Vector3(
+          (Math.random() - 0.5) * 0.5,
+          -1, // Throw down
+          (Math.random() - 0.5) * 0.5
+        ).normalize().multiplyScalar(throwForce * 0.1);
+
+        die.body.velocity.set(throwDirection.x, throwDirection.y, throwDirection.z);
+
+        die.body.angularVelocity.set(
+          (Math.random() - 0.5) * spinForce * 0.1,
+          (Math.random() - 0.5) * spinForce * 0.1,
+          (Math.random() - 0.5) * spinForce * 0.1
+        );
+        releasedCount++;
+      }
+    });
+
+    // If we released dice, we need to ensure we wait for them to settle
+    if (releasedCount > 0) {
+      // Logic for waiting is handled by checkSettled loop
+    }
   }
 
   public clearDice(): void {
@@ -532,8 +597,9 @@ export class Renderer3D {
       const angularVelocity = die.body.angularVelocity.length();
       const timeElapsed = now - die.spawnTime;
 
-      // Force settle after timeout
-      if (timeElapsed > maxWaitTime) {
+      if (die.suspended) {
+        allSettled = false;
+      } else if (timeElapsed > maxWaitTime) {
         die.settled = true;
       } else if (velocity < settleThreshold && angularVelocity < settleThreshold) {
         die.settleFrames++;
@@ -606,6 +672,10 @@ export class Renderer3D {
     };
 
     render();
+  }
+
+  public getDiceCount(): number {
+    return this.dice.length;
   }
 
   public onSettled(callback: (results: { type: DieType; value: number }[]) => void): void {
