@@ -452,6 +452,11 @@ export class Renderer2D {
     }
   }
 
+  public clearDice(): void {
+    this.dice = [];
+    this.renderStatic();
+  }
+
   public dispose(): void {
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);

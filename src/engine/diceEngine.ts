@@ -12,9 +12,16 @@ export const getTotalDiceCount = (pool: DicePool): number => {
     .reduce((total, [, count]) => total + (count as number), 0);
 };
 
+export const getBottomFace = (value: number, sides: number): number => {
+  // Bottom face is opposite of top face on a standard die
+  return sides + 1 - value;
+};
+
 export const rollDie = (type: DieType): number => {
   const sides = parseInt(type.substring(1));
-  return Math.floor(Math.random() * sides) + 1;
+  const top = Math.floor(Math.random() * sides) + 1;
+  // Return bottom face globally as per requirement
+  return getBottomFace(top, sides);
 };
 
 export const rollPool = (pool: DicePool): DieResult[] => {
@@ -58,6 +65,14 @@ export const formatResults = (results: DieResult[]): string => {
 
 export const getDieSides = (type: DieType): number => {
   return parseInt(type.substring(1));
+};
+
+// Helper to convert an array of DieResult to bottom-face values
+export const applyBottomFace = (results: DieResult[]): DieResult[] => {
+  return results.map(r => {
+    const sides = getDieSides(r.type);
+    return { ...r, value: getBottomFace(r.value, sides) };
+  });
 };
 
 export const generateRollId = (): string => {

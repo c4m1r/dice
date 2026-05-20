@@ -1,4 +1,6 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import { applyBottomFace } from './engine/diceEngine';
+import PowerMeter from './ui/PowerMeter';
 import { useAppStore } from './app/store';
 import { RollActionsProvider } from './app/rollActions';
 import { SidebarLeft } from './ui/SidebarLeft';
@@ -123,6 +125,52 @@ function App() {
     }
   }, [settings.reducedMotion, settings.view, updateSettings]);
 
+  // Clear dice when switching modes (view or game mode)
+  useEffect(() => {
+    if (renderer3DRef.current) renderer3DRef.current.clearDice();
+    if (renderer2DRef.current) (renderer2DRef.current as any).clearDice?.(); 
+  }, [settings.view, settings.mode]);
+
+  // Handle device orientation changes
+  useEffect(() => {
+    const handleOrientation = () => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect && (renderer3DRef.current || renderer2DRef.current)) {
+        const width = rect.width;
+        const height = rect.height;
+        if (renderer3DRef.current) renderer3DRef.current.resize(width, height);
+        if (renderer2DRef.current) renderer2DRef.current.resize(width, height);
+      }
+    };
+    window.addEventListener('orientationchange', handleOrientation);
+    return () => window.removeEventListener('orientationchange', handleOrientation);
+  }, []);
+
+  // Power meter state for manual roll
+  const [powerLevel, setPowerLevel] = useState(0);
+  const powerActiveRef = useRef(false);
+  const powerAnimRef = useRef(0);
+
+  const startPowerAnimation = () => {
+    powerActiveRef.current = true;
+    const animate = (time: number) => {
+      if (!powerActiveRef.current) return;
+      // oscillate between 0 and 1 over 2 seconds full cycle
+      const cycle = 2000; // ms for full up and down
+      const phase = (time % cycle) / cycle; // 0-1
+      const level = phase < 0.5 ? phase * 2 : (1 - phase) * 2; // triangular wave
+      setPowerLevel(level);
+      powerAnimRef.current = requestAnimationFrame(animate);
+    };
+    powerAnimRef.current = requestAnimationFrame(animate);
+  };
+
+  const stopPowerAnimation = () => {
+    powerActiveRef.current = false;
+    cancelAnimationFrame(powerAnimRef.current);
+    setPowerLevel(0);
+  };
+
   // Update table background
   useEffect(() => {
     const { url, repeat } = resolveTableBackground(settings.tableBackground);
@@ -192,7 +240,8 @@ function App() {
       return;
     }
 
-    const preResults = rollDicePool(poolForRoll);
+    let preResults = rollDicePool(poolForRoll);
+    preResults = applyBottomFace(preResults);
 
     // Handle rendering
     const activeRenderer = (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion)
@@ -550,35 +599,28 @@ function App() {
                   return;
                 }
 
-                setIsRolling(true);
                 const die = lastSelectedDie || 'd20';
-
                 if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
                   renderer3DRef.current.spawnSuspendedDie(die);
                 }
 
-                const startTime = Date.now();
+                // Start power meter animation
+                startPowerAnimation();
 
                 const handlePointerUp = () => {
-                  const holdTime = Date.now() - startTime;
-                  const power = Math.min(holdTime / 1500, 1);
+                  stopPowerAnimation();
+                  const power = powerLevel; // use current level (0-1)
 
                   if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
                     renderer3DRef.current.onSettled((results) => {
                       const finalTotal = calculateTotal(results, pool.modifier);
-
-                      // Reconstruct pool from results
                       const newPool: DicePool = {
                         d2: 0, d4: 0, d5: 0, d6: 0, d8: 0, d10: 0, d12: 0, d20: 0,
                         modifier: pool.modifier
                       };
-
                       results.forEach(r => {
-                        if (typeof newPool[r.type] === 'number') {
-                          newPool[r.type]++;
-                        }
+                        if (typeof newPool[r.type] === 'number') newPool[r.type]++;
                       });
-
                       const event = {
                         id: generateRollId(),
                         timestamp: Date.now(),
@@ -592,15 +634,12 @@ function App() {
                       addToHistory(event);
                       setIsRolling(false);
                     });
-
                     const throwForce = settings.throwForce * (0.4 + 1.2 * power);
                     const spinForce = settings.spinForce;
                     renderer3DRef.current.releaseSuspendedDice(throwForce, spinForce);
                   } else {
-                    // Fallback for 2D 
                     performSingleRoll(power);
                   }
-
                   document.removeEventListener('pointerup', handlePointerUp);
                   document.removeEventListener('pointercancel', handlePointerUp);
                 };
@@ -617,6 +656,10 @@ function App() {
                 <circle cx="12" cy="12" r="1" fill="currentColor" />
               </svg>
             </button>
+            {/* Power meter overlay */}
+            {powerLevel > 0 && (
+              <PowerMeter level={powerLevel} />
+            )}
           )}
         </div>
 
