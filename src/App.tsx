@@ -148,18 +148,36 @@ function App() {
 
   // Power meter state for manual roll
   const [powerLevel, setPowerLevel] = useState(0);
+  const powerLevelRef = useRef(0);
   const powerActiveRef = useRef(false);
   const powerAnimRef = useRef(0);
+  const powerStartTimeRef = useRef(0);
 
   const startPowerAnimation = () => {
     powerActiveRef.current = true;
+    powerStartTimeRef.current = performance.now();
     const animate = (time: number) => {
       if (!powerActiveRef.current) return;
-      // oscillate between 0 and 1 over 2 seconds full cycle
-      const cycle = 2000; // ms for full up and down
-      const phase = (time % cycle) / cycle; // 0-1
-      const level = phase < 0.5 ? phase * 2 : (1 - phase) * 2; // triangular wave
+      const elapsed = time - powerStartTimeRef.current;
+      // 3600ms total cycle:
+      // 0-1000ms: rise (0 -> 1)
+      // 1000-1800ms: hold max (1)
+      // 1800-2800ms: fall (1 -> 0)
+      // 2800-3600ms: hold min (0)
+      const cycle = 3600;
+      const t = elapsed % cycle;
+      let level = 0;
+      if (t < 1000) {
+        level = t / 1000;
+      } else if (t < 1800) {
+        level = 1;
+      } else if (t < 2800) {
+        level = 1 - (t - 1800) / 1000;
+      } else {
+        level = 0;
+      }
       setPowerLevel(level);
+      powerLevelRef.current = level;
       powerAnimRef.current = requestAnimationFrame(animate);
     };
     powerAnimRef.current = requestAnimationFrame(animate);
@@ -586,8 +604,9 @@ function App() {
           </button>
 
           {/* Manual roll button - only in roll/divination modes */}
-          {(settings.mode === 'roll' || settings.mode === 'divination') && (
-            <button
+          {settings.mode === 'roll' && (
+            <>
+              <button
               onPointerDown={(e) => {
                 e.preventDefault();
                 if (isRolling) return;
@@ -608,8 +627,8 @@ function App() {
                 startPowerAnimation();
 
                 const handlePointerUp = () => {
+                  const power = powerLevelRef.current; // use current level (0-1)
                   stopPowerAnimation();
-                  const power = powerLevel; // use current level (0-1)
 
                   if (settings.view === '3d' && renderer3DRef.current && !settings.reducedMotion) {
                     renderer3DRef.current.onSettled((results) => {
@@ -660,7 +679,8 @@ function App() {
             {powerLevel > 0 && (
               <PowerMeter level={powerLevel} />
             )}
-          )}
+          </>
+        )}
         </div>
 
         {/* Menu Drawer */}

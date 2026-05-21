@@ -140,6 +140,7 @@ export class Renderer3D {
 
   private addNumberDecals(mesh: THREE.Mesh, type: DieType): void {
     const sides = parseInt(type.substring(1));
+    this.ensureFaceNormals(type);
     const faceNormals = this.faceNormals.get(type);
     if (!faceNormals) return;
 
@@ -180,18 +181,29 @@ export class Renderer3D {
       // D10 (r=1,h=1.2) -> ~0.9
       // D12 (r=1.2) -> ~0.95
       // D20 (r=1.3) -> ~0.98
-      // offset = 0.005
-      let distance = 0.51;
+      let distance = 0.52;
 
       switch (type) {
-        case 'd2': distance = 0.255; break; // Updated for box geometry
-        case 'd4': distance = 0.405; break;
-        case 'd5': distance = 0.91; break; // Tuned for D10-like
-        case 'd6': distance = 0.705; break;
-        case 'd8': distance = 0.755; break;
-        case 'd10': distance = 0.91; break;
-        case 'd12': distance = 0.955; break;
-        case 'd20': distance = 0.985; break;
+        case 'd2': distance = 0.265; break; // Updated for box geometry
+        case 'd4': distance = 0.415; break;
+        case 'd5': distance = 0.925; break; // Tuned for D10-like
+        case 'd6': distance = 0.715; break;
+        case 'd8': distance = 0.765; break;
+        case 'd10': distance = 0.925; break;
+        case 'd12': distance = 0.965; break;
+        case 'd20': distance = 0.995; break;
+        default: {
+          if (sides <= 6) {
+            distance = 0.715;
+          } else if (sides <= 8) {
+            distance = 0.765;
+          } else if (sides <= 12) {
+            distance = 0.965;
+          } else {
+            distance = 0.995;
+          }
+          break;
+        }
       }
 
       const pos = normal.clone().multiplyScalar(distance);
@@ -199,6 +211,7 @@ export class Renderer3D {
 
       // Orient plane to face normal
       plane.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+      plane.renderOrder = 10;
 
       mesh.add(plane);
     }
@@ -350,14 +363,49 @@ export class Renderer3D {
         return new THREE.DodecahedronGeometry(1.2, 0);
       case 'd20':
         return new THREE.IcosahedronGeometry(1.3, 0);
-      default:
-        return new THREE.BoxGeometry(1, 1, 1);
+      default: {
+        const sides = parseInt(type.substring(1)) || 6;
+        if (sides <= 6) {
+          return new THREE.BoxGeometry(1.4, 1.4, 1.4);
+        } else if (sides <= 8) {
+          return new THREE.OctahedronGeometry(1.3, 0);
+        } else if (sides <= 12) {
+          return new THREE.DodecahedronGeometry(1.2, 0);
+        } else if (sides <= 20) {
+          return new THREE.IcosahedronGeometry(1.3, 0);
+        } else {
+          // Faceted Sphere look
+          return new THREE.IcosahedronGeometry(1.3, 1);
+        }
+      }
     }
   }
 
   private createDieMaterials(type: DieType): THREE.Material | THREE.Material[] {
-    const baseColor = (this.materials.get(type) as THREE.MeshLambertMaterial)?.color.getHex() || 0x808080;
-    return this.materials.get(type) || new THREE.MeshLambertMaterial({ color: baseColor });
+    if (this.materials.has(type)) {
+      return this.materials.get(type)!;
+    }
+
+    const colorSchemes = {
+      mixed: [0x7c3aed, 0x059669, 0xdc2626, 0xea580c, 0x1f2937, 0xbe185d, 0x16537e, 0xfbbf24],
+      red: [0xdc2626],
+      green: [0x059669],
+      blue: [0x2563eb],
+      yellow: [0xeab308],
+      purple: [0x9333ea]
+    };
+
+    const scheme = colorSchemes[this.diceColor] || colorSchemes.mixed;
+    const sides = parseInt(type.substring(1)) || 6;
+    const color = scheme[sides % scheme.length];
+
+    const mat = new THREE.MeshLambertMaterial({
+      color,
+      transparent: true,
+      opacity: 0.9
+    });
+    this.materials.set(type, mat);
+    return mat;
   }
 
   private buildFaceNormals(): void {
@@ -382,6 +430,41 @@ export class Renderer3D {
       this.faceNormals.set(type, values);
       geometry.dispose();
     });
+  }
+
+  private ensureFaceNormals(type: DieType): void {
+    if (this.faceNormals.has(type)) return;
+
+    const sides = parseInt(type.substring(1));
+    if (isNaN(sides) || sides < 2) {
+      this.faceNormals.set(type, [{ normal: new THREE.Vector3(0, 1, 0), value: 1 }]);
+      return;
+    }
+
+    // Generate N points using Fibonacci Spiral on a sphere
+    const normals: FaceNormal[] = [];
+    const phi = Math.PI * (3 - Math.sqrt(5)); // Golden angle
+
+    for (let i = 0; i < sides; i++) {
+      let y;
+      if (sides === 1) {
+        y = 1;
+      } else {
+        y = 1 - (i / (sides - 1)) * 2; // y goes from 1 to -1
+      }
+      const radius = Math.sqrt(1 - y * y);
+      const theta = phi * i;
+
+      const x = Math.cos(theta) * radius;
+      const z = Math.sin(theta) * radius;
+
+      normals.push({
+        normal: new THREE.Vector3(x, y, z).normalize(),
+        value: i + 1
+      });
+    }
+
+    this.faceNormals.set(type, normals);
   }
 
   private extractFaceNormals(
@@ -610,6 +693,34 @@ export class Renderer3D {
       die.mesh.geometry.dispose();
     });
     this.dice = [];
+
+    // Remove old card if exists
+    const oldCard = this.scene.getObjectByName('randomizer-card');
+    if (oldCard) {
+      this.scene.remove(oldCard);
+      oldCard.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry.dispose();
+          if (obj.material instanceof THREE.Material) {
+            obj.material.dispose();
+          }
+        }
+      });
+    }
+
+    // Clear previous straws
+    const oldStraws = this.scene.children.filter(obj => obj.name.startsWith('straw-'));
+    oldStraws.forEach(obj => {
+      this.scene.remove(obj);
+      obj.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose();
+          }
+        }
+      });
+    });
   }
 
   private checkSettled(): void {
@@ -656,18 +767,19 @@ export class Renderer3D {
   private getDieValue(die: Die3D): number {
     const sides = parseInt(die.type.substring(1));
     if (!this.resultByPhysics) {
-      return die.prerollValue ?? Math.floor(Math.random() * sides) + 1;
+      return die.prerollValue ?? (sides + 1 - (Math.floor(Math.random() * sides) + 1));
     }
+    this.ensureFaceNormals(die.type);
     const faceNormals = this.faceNormals.get(die.type);
     if (!faceNormals || faceNormals.length === 0) {
-      return Math.floor(Math.random() * sides) + 1;
+      return sides + 1 - (Math.floor(Math.random() * sides) + 1);
     }
-    const up = new THREE.Vector3(0, 1, 0);
+    const down = new THREE.Vector3(0, -1, 0);
     let bestDot = -Infinity;
     let bestValue = 1;
     faceNormals.forEach(({ normal, value }) => {
       const worldNormal = normal.clone().applyQuaternion(die.mesh.quaternion).normalize();
-      const dot = worldNormal.dot(up);
+      const dot = worldNormal.dot(down);
       if (dot > bestDot) {
         bestDot = dot;
         bestValue = value;

@@ -67,7 +67,7 @@ export const SidebarRight: React.FC = () => {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent pr-2">
+        <div className="flex-1 overflow-y-auto space-y-3 pr-2">
           {history.length === 0 ? (
             <p className="text-gray-400 text-center py-8">История пуста</p>
           ) : (

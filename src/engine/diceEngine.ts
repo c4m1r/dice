@@ -20,8 +20,7 @@ export const getBottomFace = (value: number, sides: number): number => {
 export const rollDie = (type: DieType): number => {
   const sides = parseInt(type.substring(1));
   const top = Math.floor(Math.random() * sides) + 1;
-  // Return bottom face globally as per requirement
-  return getBottomFace(top, sides);
+  return top;
 };
 
 export const rollPool = (pool: DicePool): DieResult[] => {

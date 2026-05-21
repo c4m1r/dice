@@ -29,7 +29,7 @@ export const SidebarLeft: React.FC = () => {
   const [modifierTipOpen, setModifierTipOpen] = useState(false);
 
   const updateDieCount = (type: DieType, delta: number) => {
-    const currentCount = pool[type];
+    const currentCount = pool[type] || 0;
     const newCount = Math.max(0, Math.min(20, currentCount + delta));
     const totalAfter = getTotalDiceCount({ ...pool, [type]: newCount });
     if (delta > 0 && totalAfter > settings.maxDiceOnTable) {
@@ -48,7 +48,7 @@ export const SidebarLeft: React.FC = () => {
   };
 
   return (
-    <div className="w-full h-full text-white p-4 flex flex-col">
+    <div className="w-full h-full text-white p-4 flex flex-col overflow-y-auto pr-2">
       {/* Menu Button */}
       <button
         onClick={toggleMenuDrawer}
@@ -198,6 +198,119 @@ export const SidebarLeft: React.FC = () => {
                 </div>
               );
             })}
+
+            {/* Custom Dice List */}
+            {(settings.customDiceTypes || []).map((type) => {
+              const count = pool[type] || 0;
+              const sides = parseInt(type.substring(1)) || 6;
+              const name = type.toUpperCase();
+              const description = `Кастомная кость (${sides} граней)`;
+
+              return (
+                <div key={type} className="flex items-center gap-3 p-2 bg-gray-700/60 border border-gray-600 rounded">
+                  <div className="relative">
+                    <Dice5 size={20} className="text-purple-400" />
+                    <button
+                      type="button"
+                      onPointerEnter={() => setShowTooltip(type)}
+                      onPointerLeave={() => setShowTooltip(null)}
+                      onClick={() => setShowTooltip(showTooltip === type ? null : type)}
+                      className="absolute -right-2 -top-2 w-4 h-4 rounded-full bg-gray-900 text-[10px] flex items-center justify-center"
+                      aria-label="Информация"
+                    >
+                      <Info size={10} />
+                    </button>
+                    {showTooltip === type && (
+                      <div className="absolute left-full ml-2 top-0 bg-gray-900 text-xs p-2 rounded whitespace-nowrap z-10">
+                        {description}
+                      </div>
+                    )}
+                  </div>
+
+                  <span className="w-8 text-sm font-mono text-purple-300">{name}</span>
+
+                  <div className="flex items-center gap-2 ml-auto">
+                    <button
+                      onClick={() => updateDieCount(type, -1)}
+                      disabled={count === 0}
+                      className="w-8 h-8 bg-red-600 rounded text-lg font-bold hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      −
+                    </button>
+
+                    <span className="w-8 text-center font-mono">{count}</span>
+
+                    <button
+                      onClick={() => updateDieCount(type, 1)}
+                      disabled={count >= 20}
+                      className="w-8 h-8 bg-green-600 rounded text-lg font-bold hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      +
+                    </button>
+
+                    {/* Delete custom die type completely */}
+                    <button
+                      onClick={() => {
+                        const newCustom = (settings.customDiceTypes || []).filter(t => t !== type);
+                        updateSettings({ customDiceTypes: newCustom });
+                        updatePool({ [type]: 0 });
+                      }}
+                      className="ml-1 w-6 h-6 text-red-400 hover:text-red-300 flex items-center justify-center text-xs"
+                      title="Удалить"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Add Custom Die Form */}
+          <div className="mt-3 p-2 bg-gray-800/80 rounded border border-gray-700/60">
+            <span className="text-xs text-gray-400 block mb-1">Добавить свою кость:</span>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min="2"
+                max="120"
+                placeholder="Грани (напр. 30)"
+                id="custom-sides-input"
+                className="flex-1 min-w-0 px-2 py-1 bg-gray-900 border border-gray-700 rounded text-sm text-white font-mono"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const btn = document.getElementById('add-custom-die-btn');
+                    if (btn) btn.click();
+                  }
+                }}
+              />
+              <button
+                id="add-custom-die-btn"
+                onClick={() => {
+                  const input = document.getElementById('custom-sides-input') as HTMLInputElement;
+                  const sides = parseInt(input?.value || '');
+                  if (isNaN(sides) || sides < 2 || sides > 120) {
+                    alert('Пожалуйста, введите число граней от 2 до 120.');
+                    return;
+                  }
+                  const newType = `d${sides}`;
+                  const customList = settings.customDiceTypes || [];
+                  if (customList.includes(newType)) {
+                    alert('Такая кость уже добавлена!');
+                    return;
+                  }
+                  // Add type
+                  updateSettings({ customDiceTypes: [...customList, newType] });
+                  // Set count to 1 by default
+                  updateDieCount(newType, 1);
+                  if (input) input.value = '';
+                }}
+                className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded transition-colors animate-pulse-subtle"
+              >
+                + Своя
+              </button>
+            </div>
           </div>
 
           {/* Modifier */}

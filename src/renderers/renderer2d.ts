@@ -23,7 +23,7 @@ export class Renderer2D {
   private backgroundImage: HTMLImageElement | null = null;
   private backgroundReady = false;
 
-  private colors: Record<DieType, string> = {
+  private colors: Record<string, string> = {
     d2: '#fbbf24', // Gold
     d4: '#16537e',
     d5: '#be185d', // Pink
@@ -33,6 +33,13 @@ export class Renderer2D {
     d12: '#ea580c',
     d20: '#1f2937'
   };
+
+  private getDieColor(type: DieType): string {
+    if (this.colors[type]) return this.colors[type];
+    const customColors = ['#7c3aed', '#059669', '#dc2626', '#ea580c', '#1f2937', '#be185d', '#16537e', '#fbbf24'];
+    const sides = parseInt(type.substring(1)) || 6;
+    return customColors[sides % customColors.length];
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -94,7 +101,7 @@ export class Renderer2D {
         scale: 0,
         scaleTarget: 1,
         alpha: 1,
-        color: this.colors[die.type]
+        color: this.getDieColor(die.type)
       });
     });
 
@@ -295,6 +302,28 @@ export class Renderer2D {
         this.ctx.arc(0, 0, size, 0, Math.PI * 2);
         this.ctx.closePath();
         break;
+
+      default: {
+        // Custom dice shape fallback
+        const customSides = parseInt(type.substring(1)) || 6;
+        if (customSides <= 20 && customSides >= 3) {
+          this.ctx.beginPath();
+          for (let i = 0; i < customSides; i++) {
+            const angle = (i * Math.PI * 2) / customSides - Math.PI / 2;
+            const x = Math.cos(angle) * size;
+            const y = Math.sin(angle) * size;
+            if (i === 0) this.ctx.moveTo(x, y);
+            else this.ctx.lineTo(x, y);
+          }
+          this.ctx.closePath();
+        } else {
+          // Circle for high side counts
+          this.ctx.beginPath();
+          this.ctx.arc(0, 0, size, 0, Math.PI * 2);
+          this.ctx.closePath();
+        }
+        break;
+      }
     }
 
     if (stroke) {

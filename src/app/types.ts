@@ -1,4 +1,4 @@
-export type DieType = 'd2' | 'd4' | 'd5' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20';
+export type DieType = 'd2' | 'd4' | 'd5' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | string;
 export type Language = 'ru' | 'en' | 'ko' | 'zh' | 'es' | 'ja';
 
 export type TableBackgroundSetting =
@@ -15,6 +15,7 @@ export interface DicePool {
   d12: number;
   d20: number;
   modifier: number;
+  [key: string]: number;
 }
 
 export interface DieResult {
@@ -49,6 +50,7 @@ export interface AppSettings {
   tableBackground: TableBackgroundSetting;
   language: Language;
   welcomeShown: boolean;
+  customDiceTypes?: string[];
 }
 
 export interface AppState {

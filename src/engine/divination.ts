@@ -56,11 +56,11 @@ export const threeDiceDivination: Record<number, string> = {
 };
 
 export const interpretOneDie = (results: number[]): string => {
-  const pattern = results
-    .map(value => value % 2 === 0 ? 'X' : 'O')
-    .join('');
+  const vals = [...results];
+  while (vals.length < 4) vals.push(1);
+  const pattern = vals.slice(0, 4).map(v => v % 2 === 0 ? 'X' : 'O').join('');
   
-  return oneDieDivination[pattern] || 'Неизвестный паттерн. Доверьтесь своей интуиции в интерпретации.';
+  return oneDieDivination[pattern] || '...';
 };
 
 export const interpretTwoDice = (sum: number): string => {
